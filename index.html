@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Chapter 21 — Maggot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --void:        #090c09;
+    --panel:       #0e140f;
+    --panel-2:     #121a14;
+    --green-deep:  #1f4a34;
+    --green-mid:   #3c8562;
+    --green-bright:#8fe3a6;
+    --text:        #e9efe7;
+    --text-muted:  #8fa396;
+    --line:        rgba(143,227,166,0.18);
+    --danger:      #e3806f;
+    --lemon:       #d9d24a;
+
+    --display: 'Anton', sans-serif;
+    --body:    'Manrope', sans-serif;
+    --mono:    'JetBrains Mono', monospace;
+    --ease: cubic-bezier(.16,.84,.24,1);
+  }
+  *{ margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ height:100%; overflow:hidden; background:var(--void); }
+  body{ font-family:var(--body); color:var(--text); -webkit-font-smoothing:antialiased; }
+  ::selection{ background:var(--green-bright); color:var(--void); }
+  button{ font-family:inherit; }
+  :focus-visible{ outline:2px solid var(--green-bright); outline-offset:3px; }
+
+  #gameCanvas{ position:fixed; inset:0; display:block; }
+
+  .grain{
+    position:fixed; inset:0; pointer-events:none; z-index:300; opacity:0.045; mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .scanlines{
+    position:fixed; inset:0; pointer-events:none; z-index:299; opacity:0.045;
+    background:repeating-linear-gradient(0deg, #000 0 1px, transparent 1px 3px);
+  }
+  .flash{ position:fixed; inset:0; z-index:400; background:var(--green-bright); opacity:0; pointer-events:none; }
+  .flash.go{ animation:flashPulse .3s ease-out; }
+  .flash.hit{ background:var(--lemon); animation:flashPulse .35s ease-out; }
+  @keyframes flashPulse{ 0%{opacity:0;} 15%{opacity:.6;} 100%{opacity:0;} }
+
+  /* ============================================================
+     BOOT
+  ============================================================ */
+  #boot{
+    position:fixed; inset:0; z-index:500; background:var(--void);
+    display:flex; align-items:center; justify-content:center; text-align:center;
+    padding:24px;
+  }
+  #boot.hide{ display:none; }
+  .boot-logo{ font-family:var(--mono); font-size:11px; letter-spacing:0.4em; color:var(--text-muted); animation:flicker 3.2s infinite; }
+  @keyframes flicker{ 0%,19%,21%,23%,25%,54%,56%,100%{opacity:1;} 20%,24%,55%{opacity:.4;} }
+  .boot-title{ font-family:var(--display); font-weight:400; line-height:0.86; font-size:clamp(52px,13vw,160px); margin-top:16px; }
+  .boot-title span{
+    display:block; background:linear-gradient(180deg, var(--green-bright), var(--green-mid) 70%);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .boot-sub{ margin-top:16px; font-weight:600; font-size:clamp(14px,2vw,18px); color:var(--text-muted); }
+  .boot-sub b{ color:var(--green-bright); }
+  .boot-desc{ margin-top:14px; font-family:var(--mono); font-size:12px; color:var(--text-muted); max-width:46ch; margin-left:auto; margin-right:auto; line-height:1.7; }
+  .boot-loading{ margin:40px auto 0; max-width:320px; }
+  .boot-loading-label{ font-family:var(--mono); font-size:11px; letter-spacing:0.1em; color:var(--text-muted); margin-bottom:10px; height:16px; }
+  .boot-bar-track{ width:100%; height:3px; background:var(--line); }
+  .boot-bar-fill{ height:100%; width:0%; background:var(--green-bright); }
+  .start-btn{
+    margin-top:40px; background:transparent; border:1.5px solid var(--green-bright); color:var(--green-bright);
+    font-family:var(--mono); font-size:13px; letter-spacing:0.2em; text-transform:uppercase;
+    padding:16px 40px; cursor:pointer; border-radius:2px;
+    opacity:0; transform:translateY(10px); pointer-events:none;
+    transition:opacity .5s var(--ease), transform .5s var(--ease), background .3s, color .3s;
+    animation:pulseGlow 2s ease-in-out infinite;
+  }
+  .start-btn.show{ opacity:1; transform:translateY(0); pointer-events:auto; }
+  .start-btn:hover{ background:var(--green-bright); color:var(--void); }
+  @keyframes pulseGlow{ 0%,100%{box-shadow:0 0 0 0 rgba(143,227,166,.35);} 50%{box-shadow:0 0 0 10px rgba(143,227,166,0);} }
+
+  /* ============================================================
+     HUD
+  ============================================================ */
+  .hud-top{
+    position:fixed; top:0; left:0; right:0; z-index:250;
+    display:flex; justify-content:space-between; align-items:flex-start;
+    padding:18px clamp(14px,3vw,32px);
+    font-family:var(--mono); pointer-events:none;
+  }
+  .hud-card{
+    background:rgba(14,20,15,0.72); border:1px solid var(--line); border-radius:3px;
+    padding:10px 14px; backdrop-filter:blur(4px); pointer-events:auto;
+  }
+  .shard-counter{ font-size:12px; letter-spacing:0.1em; color:var(--green-bright); }
+  .controls-hint{ font-size:10px; color:var(--text-muted); margin-top:4px; letter-spacing:0.04em; line-height:1.6; }
+  .hud-btn{
+    background:none; border:1px solid var(--line); color:var(--text-muted);
+    width:34px; height:34px; border-radius:50%; cursor:pointer; font-size:14px;
+    display:flex; align-items:center; justify-content:center; transition:border-color .3s, color .3s;
+    pointer-events:auto;
+  }
+  .hud-btn:hover{ border-color:var(--green-bright); color:var(--green-bright); }
+
+  .hotbar{
+    position:fixed; bottom:22px; left:50%; transform:translateX(-50%); z-index:250;
+    display:flex; gap:10px; pointer-events:none;
+  }
+  .slot{
+    width:56px; height:56px; background:rgba(14,20,15,0.78); border:1.5px solid var(--line);
+    border-radius:4px; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    font-family:var(--mono); position:relative; transition:border-color .2s;
+  }
+  .slot.active{ border-color:var(--green-bright); box-shadow:0 0 0 2px rgba(143,227,166,0.25); }
+  .slot .swatch{ width:18px; height:18px; border-radius:2px; margin-bottom:4px; }
+  .slot .count{ font-size:10px; color:var(--text-muted); }
+  .slot .key{ position:absolute; top:3px; left:5px; font-size:9px; color:var(--text-muted); }
+
+  .interact-prompt{
+    position:fixed; z-index:240; transform:translate(-50%,-100%);
+    background:rgba(14,20,15,0.85); border:1px solid var(--green-bright);
+    padding:7px 12px; border-radius:3px; font-family:var(--mono); font-size:11px;
+    color:var(--green-bright); white-space:nowrap; pointer-events:none; opacity:0; transition:opacity .15s;
+  }
+  .interact-prompt.show{ opacity:1; }
+
+  .toast{
+    position:fixed; top:80px; left:50%; transform:translateX(-50%) translateY(-10px); z-index:270;
+    background:var(--panel-2); border:1px solid var(--green-bright); padding:11px 18px; border-radius:3px;
+    font-family:var(--mono); font-size:11.5px; letter-spacing:0.04em; color:var(--green-bright); opacity:0;
+    transition:opacity .4s var(--ease), transform .4s var(--ease); pointer-events:none; max-width:80vw; text-align:center;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+  /* ============================================================
+     MODALS
+  ============================================================ */
+  .modal{
+    position:fixed; inset:0; z-index:450; background:rgba(6,9,7,0.88);
+    display:none; align-items:center; justify-content:center; padding:6vw 20px;
+  }
+  .modal.open{ display:flex; }
+  .modal-panel{
+    width:100%; max-width:640px; max-height:82vh; overflow-y:auto;
+    background:rgba(18,26,20,0.9); border:1px solid var(--line); border-radius:4px;
+    padding:clamp(22px,4vw,40px); position:relative;
+  }
+  .modal-close{
+    position:absolute; top:16px; right:16px; background:none; border:1px solid var(--line);
+    color:var(--text-muted); font-family:var(--mono); font-size:11px; padding:8px 12px; border-radius:2px; cursor:pointer;
+  }
+  .modal-close:hover{ border-color:var(--green-bright); color:var(--green-bright); }
+  .modal-eyebrow{ font-family:var(--mono); font-size:11px; letter-spacing:0.24em; text-transform:uppercase; color:var(--green-bright); }
+  .modal-title{ font-family:var(--display); font-size:clamp(24px,4vw,38px); margin-top:10px; line-height:1; }
+
+  /* subject file */
+  .sheet-top{ display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:14px; border-bottom:1px solid var(--line); padding-bottom:16px; margin:22px 0; }
+  .sheet-name{ font-family:var(--display); font-size:clamp(24px,4vw,36px); line-height:1; }
+  .sheet-alias{ font-family:var(--mono); font-size:11px; color:var(--text-muted); margin-top:6px; }
+  .sheet-level{ text-align:right; font-family:var(--mono); }
+  .sheet-level .num{ font-family:var(--display); font-size:clamp(32px,6vw,52px); color:var(--green-bright); line-height:.8; }
+  .sheet-level .lbl{ font-size:9px; letter-spacing:0.18em; color:var(--text-muted); }
+  .stat{ margin-bottom:16px; }
+  .stat-row{ display:flex; justify-content:space-between; font-family:var(--mono); font-size:11px; margin-bottom:6px; }
+  .stat-row .val{ color:var(--green-bright); }
+  .stat-track{ height:7px; background:var(--panel-2); border:1px solid var(--line); overflow:hidden; }
+  .stat-fill{ height:100%; width:0%; background:linear-gradient(90deg, var(--green-deep), var(--green-bright)); transition:width 1s var(--ease); }
+  .tag-list{ display:flex; flex-wrap:wrap; gap:8px; margin-top:20px; }
+  .tag{ font-family:var(--mono); font-size:11px; padding:5px 10px; border:1px solid var(--green-deep); border-radius:2px; }
+
+  /* archive */
+  .archive-note{ margin-top:14px; color:var(--text-muted); font-size:14px; line-height:1.7; }
+  .archive-note b{ color:var(--text); }
+  .archive-btn{
+    margin-top:18px; background:transparent; border:1.5px solid var(--green-bright); color:var(--green-bright);
+    font-family:var(--mono); font-size:11.5px; letter-spacing:0.12em; text-transform:uppercase;
+    padding:11px 18px; border-radius:2px; cursor:pointer; transition:background .3s,color .3s;
+  }
+  .archive-btn:hover{ background:var(--green-bright); color:var(--void); }
+  .g-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:22px; }
+  .g-tile{ position:relative; aspect-ratio:4/5; overflow:hidden; background:var(--panel-2); border:1px solid var(--line); cursor:pointer; }
+  .g-tile img,.g-tile video{ width:100%; height:100%; object-fit:cover; }
+  .g-tile.empty{ display:flex; align-items:center; justify-content:center; border:1px dashed var(--line); }
+  .g-tile.empty .plus{ font-family:var(--mono); font-size:10px; color:var(--text-muted); text-align:center; padding:0 8px; }
+
+  /* ============================================================
+     FINALE
+  ============================================================ */
+  #finale{
+    position:fixed; inset:0; z-index:480; background:radial-gradient(50% 60% at 50% 40%, rgba(63,133,98,0.22), transparent 70%), var(--void);
+    display:none; align-items:center; justify-content:center; text-align:center; padding:60px 24px; overflow-y:auto;
+  }
+  #finale.open{ display:flex; }
+  .lvl-eyebrow{ font-family:var(--mono); font-size:12px; letter-spacing:0.3em; color:var(--text-muted); }
+  .lvl-num{
+    font-family:var(--display); font-weight:400; line-height:.8; font-size:clamp(80px,18vw,200px);
+    background:linear-gradient(180deg, var(--text), var(--green-mid)); -webkit-background-clip:text; background-clip:text; color:transparent; margin-top:10px;
+  }
+  .lvl-sub{ font-family:var(--mono); font-size:12px; letter-spacing:0.14em; color:var(--green-bright); margin-top:6px; }
+  .letter-final{ max-width:600px; margin:36px auto 0; text-align:left; font-size:15.5px; line-height:1.85; color:var(--text); }
+  .letter-final .sign{ margin-top:18px; font-family:var(--mono); font-size:12.5px; color:var(--text-muted); }
+  .ach-list{ margin:36px auto 0; max-width:420px; text-align:left; display:flex; flex-direction:column; gap:10px; }
+  .ach{ display:flex; align-items:center; gap:12px; font-family:var(--mono); font-size:12px; color:var(--text); }
+  .ach .check{ width:16px; height:16px; border:1px solid var(--green-bright); border-radius:3px; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:10px; color:var(--green-bright); }
+  .credits{ margin-top:40px; display:flex; flex-direction:column; gap:6px; font-family:var(--mono); font-size:10.5px; color:var(--text-muted); }
+  .credits b{ color:var(--text); }
+  .replay-btn{
+    margin-top:34px; background:transparent; border:1.5px solid var(--green-bright); color:var(--green-bright);
+    font-family:var(--mono); font-size:12px; letter-spacing:0.16em; text-transform:uppercase; padding:14px 28px;
+    border-radius:2px; cursor:pointer; transition:background .3s,color .3s;
+  }
+  .replay-btn:hover{ background:var(--green-bright); color:var(--void); }
+
+  @media(max-width:640px){
+    .controls-hint{ display:none; }
+    .g-grid{ grid-template-columns:repeat(2,1fr); }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="gameCanvas"></canvas>
+<div class="grain"></div>
+<div class="scanlines"></div>
+<div class="flash" id="flash"></div>
+
+<!-- BOOT -->
+<div id="boot">
+  <div>
+    <div class="boot-logo">A BIRTHDAY EXPERIENCE</div>
+    <h1 class="boot-title"><span>CHAPTER</span><span>TWENTY&#8209;ONE</span></h1>
+    <p class="boot-sub">For Nkazimulo — the one and only <b>Maggot</b>.</p>
+    <p class="boot-desc">
+      Dig through his world, dodge the lemons, grab a snack or two, and piece together
+      five buried memory shards to unlock his birthday message.
+    </p>
+    <div class="boot-loading">
+      <div class="boot-loading-label" id="bootLabel">Initializing...</div>
+      <div class="boot-bar-track"><div class="boot-bar-fill" id="bootBar"></div></div>
+    </div>
+    <button class="start-btn" id="startBtn">Press Start</button>
+  </div>
+</div>
+
+<!-- HUD -->
+<div class="hud-top">
+  <div class="hud-card">
+    <div class="shard-counter" id="shardCounter">SHARDS: 0 / 5</div>
+    <div class="controls-hint">A/D move · SPACE jump · CLICK mine · RIGHT-CLICK place · E interact</div>
+  </div>
+  <button class="hud-btn" id="muteBtn" aria-label="Toggle sound">🔊</button>
+</div>
+
+<div class="hotbar" id="hotbar">
+  <div class="slot active" data-slot="0"><span class="key">1</span><span class="swatch" style="background:#6b5638;"></span><span class="count" id="countDirt">0</span></div>
+  <div class="slot" data-slot="1"><span class="key">2</span><span class="swatch" style="background:#7d7d84;"></span><span class="count" id="countStone">0</span></div>
+</div>
+
+<div class="interact-prompt" id="interactPrompt"></div>
+<div class="toast" id="toast"></div>
+
+<!-- SUBJECT FILE MODAL -->
+<div class="modal" id="modalSubject">
+  <div class="modal-panel">
+    <button class="modal-close" id="closeSubject">CLOSE ✕</button>
+    <div class="modal-eyebrow">Subject File</div>
+    <h2 class="modal-title">Character Sheet</h2>
+    <div class="sheet-top">
+      <div>
+        <div class="sheet-name">Nkazimulo</div>
+        <div class="sheet-alias">a.k.a. "Nkazi" · a.k.a. "Maggot"</div>
+      </div>
+      <div class="sheet-level"><div class="num">21</div><div class="lbl">CURRENT LEVEL</div></div>
+    </div>
+    <div class="stat" data-pct="100"><div class="stat-row"><span>GREEN LOYALTY</span><span class="val">100%</span></div><div class="stat-track"><div class="stat-fill"></div></div></div>
+    <div class="stat" data-pct="2"><div class="stat-row"><span>LEMON TOLERANCE</span><span class="val">2%</span></div><div class="stat-track"><div class="stat-fill"></div></div></div>
+    <div class="stat" data-pct="100"><div class="stat-row"><span>AVOCADO + YOGHURT COMMITMENT</span><span class="val">100%</span></div><div class="stat-track"><div class="stat-fill"></div></div></div>
+    <div class="stat" data-pct="97"><div class="stat-row"><span>BARS MEMORIZED (EM / MAC / YE / KENDRICK)</span><span class="val">97%</span></div><div class="stat-track"><div class="stat-fill"></div></div></div>
+    <div class="tag-list">
+      <span class="tag">One Piece</span><span class="tag">Attack on Titan</span><span class="tag">Invincible</span><span class="tag">The Boys</span>
+    </div>
+  </div>
+</div>
+
+<!-- ARCHIVE MODAL -->
+<div class="modal" id="modalArchive">
+  <div class="modal-panel">
+    <button class="modal-close" id="closeArchive">CLOSE ✕</button>
+    <div class="modal-eyebrow">Chapter 02 — Where It Started</div>
+    <h2 class="modal-title">The Archive</h2>
+    <p class="archive-note">
+      Five months in, and there still isn't a single photo of the two of us together — <b>yet</b>.
+      What we do have is this: the first spot we ever hung out. Add a photo if you were there.
+    </p>
+    <button class="archive-btn" id="uploadBtn">+ Upload a Photo</button>
+    <div class="g-grid" id="galleryGrid">
+      <div class="g-tile" data-full="REPLACE_WITH_IMAGE_1.jpg"><img src="REPLACE_WITH_IMAGE_1.jpg" alt="The first spot, photo one" loading="lazy"></div>
+      <div class="g-tile" data-full="REPLACE_WITH_IMAGE_2.jpg"><img src="REPLACE_WITH_IMAGE_2.jpg" alt="The first spot, photo two" loading="lazy"></div>
+      <div class="g-tile" data-full="REPLACE_WITH_VIDEO_1.mp4"><video src="REPLACE_WITH_VIDEO_1.mp4" muted loop playsinline></video></div>
+      <div class="g-tile empty" id="emptyTile"><div class="plus">+<br>add yours</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- LIGHTBOX -->
+<div class="modal" id="lightbox">
+  <div class="modal-panel" style="max-width:80vw; padding:20px; text-align:center;">
+    <button class="modal-close" id="lightboxClose">CLOSE ✕</button>
+    <div id="lightboxContent"></div>
+  </div>
+</div>
+
+<!-- FINALE -->
+<div id="finale">
+  <div>
+    <div class="lvl-eyebrow">All Shards Found</div>
+    <div class="lvl-num" id="lvlNum">0</div>
+    <div class="lvl-sub">LEVEL UP</div>
+    <div class="letter-final">
+      <p id="finalLetter"></p>
+      <div class="sign">— [Your name]</div>
+    </div>
+    <div class="ach-list" id="achList">
+      <div class="ach"><span class="check">✓</span>Found all 5 memory shards</div>
+      <div class="ach"><span class="check">✓</span>Read the archive at the terminal</div>
+      <div class="ach"><span class="check">✓</span>Opened the subject file</div>
+      <div class="ach"><span class="check">✓</span>Survived the lemon patrol</div>
+      <div class="ach"><span class="check">✓</span>Officially unlocked: Age 21</div>
+    </div>
+    <div class="credits">
+      <div><b>Starring</b> — Nkazimulo "Maggot"</div>
+      <div><b>Written &amp; directed by</b> — [Your name]</div>
+      <div><b>Soundtrack</b> — Eminem · Mac Miller · Kanye West · Kendrick Lamar</div>
+      <div><b>Executive producers</b> — Avocado &amp; Yoghurt</div>
+    </div>
+    <button class="replay-btn" id="replayBtn">↻ Dig Again</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://upload-widget.cloudinary.com/global/all.js"></script>
+<script>
+(function(){
+  /* ============================================================
+     CLOUDINARY CONFIG — replace with your real values
+  ============================================================ */
+  const CLOUDINARY_CLOUD_NAME    = "YOUR_CLOUD_NAME";
+  const CLOUDINARY_UPLOAD_PRESET = "YOUR_UPLOAD_PRESET";
+
+  const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------------- audio ---------------- */
+  let audioCtx = null, muted = false;
+  function ctx(){ if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)(); return audioCtx; }
+  function beep(freq,dur,type,vol,delay){
+    if(muted) return;
+    try{
+      const ac = ctx(); const t0 = ac.currentTime + (delay||0);
+      const osc = ac.createOscillator(); const gain = ac.createGain();
+      osc.type = type||'sine'; osc.frequency.setValueAtTime(freq,t0);
+      gain.gain.setValueAtTime(0,t0); gain.gain.linearRampToValueAtTime(vol||0.05,t0+0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
+      osc.connect(gain); gain.connect(ac.destination); osc.start(t0); osc.stop(t0+dur+0.02);
+    }catch(e){}
+  }
+  const sfx = {
+    start:  ()=>{ beep(440,.09,'square',.05,0); beep(660,.12,'square',.05,.08); },
+    tick:   ()=> beep(520,.05,'square',.035,0),
+    mine:   ()=> beep(220,.05,'square',.035,0),
+    place:  ()=> beep(330,.05,'square',.035,0),
+    collect:()=>{ beep(660,.07,'square',.05,0); beep(880,.09,'square',.05,.06); beep(1100,.1,'square',.05,.12); },
+    hit:    ()=>{ beep(160,.15,'sawtooth',.06,0); },
+    buff:   ()=>{ beep(500,.08,'triangle',.05,0); beep(700,.1,'triangle',.05,.08); },
+    levelup:()=>{ beep(523,.1,'square',.05,0); beep(659,.1,'square',.05,.1); beep(784,.1,'square',.05,.2); beep(1047,.22,'square',.06,.3); }
+  };
+  document.getElementById('muteBtn').addEventListener('click', function(){
+    muted = !muted; this.textContent = muted ? '🔇' : '🔊';
+  });
+
+  /* ---------------- toast ---------------- */
+  const toastEl = document.getElementById('toast');
+  let toastTimer = null;
+  function showToast(msg, dur){
+    clearTimeout(toastTimer);
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    toastTimer = setTimeout(()=> toastEl.classList.remove('show'), dur||2400);
+  }
+  function doFlash(cls){
+    const f = document.getElementById('flash');
+    f.classList.remove('go','hit'); void f.offsetWidth; f.classList.add(cls||'go');
+  }
+
+  /* ============================================================
+     BOOT SEQUENCE
+  ============================================================ */
+  const bootLabel = document.getElementById('bootLabel');
+  const bootBar = document.getElementById('bootBar');
+  const startBtn = document.getElementById('startBtn');
+  const bootEl = document.getElementById('boot');
+  const steps = ['Locating first hangout spot...','Counting green hoodies...','Importing avocado + yoghurt data...','Filtering out lemons...','Loading 21 years...','Ready.'];
+  let bstep = 0;
+  const bootIv = setInterval(()=>{
+    bstep++;
+    bootBar.style.width = Math.min(100, Math.round((bstep/steps.length)*100)) + '%';
+    bootLabel.textContent = steps[Math.min(bstep, steps.length-1)];
+    if(bstep >= steps.length){ clearInterval(bootIv); startBtn.classList.add('show'); }
+  }, 380);
+  startBtn.addEventListener('click', ()=>{
+    sfx.start();
+    bootEl.classList.add('hide');
+    startGame();
+  });
+
+  /* ============================================================
+     THREE.JS WORLD SETUP
+  ============================================================ */
+  const canvas = document.getElementById('gameCanvas');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias:false });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  const scene = new THREE.Scene();
+
+  const VIEW_H = 14;
+  let aspect = window.innerWidth/window.innerHeight;
+  const camera = new THREE.OrthographicCamera(-VIEW_H*aspect/2, VIEW_H*aspect/2, VIEW_H/2, -VIEW_H/2, 0.1, 100);
+  camera.position.z = 10;
+
+  function resize(){
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    aspect = window.innerWidth/window.innerHeight;
+    camera.left = -VIEW_H*aspect/2; camera.right = VIEW_H*aspect/2;
+    camera.top = VIEW_H/2; camera.bottom = -VIEW_H/2;
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  /* ---------------- world generation ---------------- */
+  const W = 70, H = 26, BEDROCK = H-1;
+  function surfaceY(x){
+    return 9 + Math.round(Math.sin(x*0.25)*1.4 + Math.sin(x*0.07)*2.2);
+  }
+  const TYPE = { GRASS:1, DIRT:2, STONE:3, BEDROCK:4 };
+  const COLORS = {
+    1: 0x3c8562, // grass
+    2: 0x6b5638, // dirt
+    3: 0x7d7d84, // stone
+    4: 0x2a2a2c  // bedrock
+  };
+  const geo = new THREE.PlaneGeometry(1,1);
+  const mats = {};
+  Object.keys(COLORS).forEach(k=>{ mats[k] = new THREE.MeshBasicMaterial({ color: COLORS[k] }); });
+
+  const tiles = [];      // tiles[col][row] = type or null
+  const tileMeshes = [];
+  for(let c=0;c<W;c++){ tiles[c]=[]; tileMeshes[c]=[]; for(let r=0;r<H;r++){ tiles[c][r]=null; tileMeshes[c][r]=null; } }
+
+  function addTileMesh(c,r,type){
+    const m = new THREE.Mesh(geo, mats[type]);
+    m.position.set(c, -r, 0);
+    scene.add(m);
+    tileMeshes[c][r] = m;
+    tiles[c][r] = type;
+  }
+
+  for(let c=0;c<W;c++){
+    const sY = surfaceY(c);
+    for(let r=sY;r<H;r++){
+      let type;
+      if(r===BEDROCK) type = TYPE.BEDROCK;
+      else if(r===sY) type = TYPE.GRASS;
+      else if(r<sY+4) type = TYPE.DIRT;
+      else type = TYPE.STONE;
+      addTileMesh(c,r,type);
+    }
+  }
+
+  function isSolidTile(c,r){
+    if(c<0||c>=W) return true;
+    if(r<0) return false;
+    if(r>=H) return true;
+    return tiles[c][r] !== null;
+  }
+  function removeTile(c,r){
+    if(tileMeshes[c] && tileMeshes[c][r]){
+      scene.remove(tileMeshes[c][r]);
+      tileMeshes[c][r] = null;
+      tiles[c][r] = null;
+    }
+  }
+
+  /* ---------------- background sky ---------------- */
+  const dayColor = new THREE.Color(0x1c3327);
+  const nightColor = new THREE.Color(0x050705);
+  scene.background = dayColor.clone();
+
+  /* stars */
+  const starGeo = new THREE.BufferGeometry();
+  const starCount = 120;
+  const starPos = new Float32Array(starCount*3);
+  for(let i=0;i<starCount;i++){
+    starPos[i*3]   = (Math.random()-0.5)*W*1.6 + W/2;
+    starPos[i*3+1] = Math.random()*20 - 4;
+    starPos[i*3+2] = -1;
+  }
+  starGeo.setAttribute('position', new THREE.BufferAttribute(starPos,3));
+  const starMat = new THREE.PointsMaterial({ color:0xffffff, size:0.05, transparent:true, opacity:0 });
+  const stars = new THREE.Points(starGeo, starMat);
+  scene.add(stars);
+
+  /* ============================================================
+     PLAYER
+  ============================================================ */
+  const player = {
+    x: 3, y: -(surfaceY(3)-1.3),
+    vx:0, vy:0, hw:0.28, hh:0.42,
+    grounded:false, facing:1,
+    speedMult:1, jumpMult:1, invuln:0
+  };
+  const playerGeo = new THREE.PlaneGeometry(0.62, 0.86);
+  const playerMat = new THREE.MeshBasicMaterial({ color:0x8fe3a6 });
+  const playerMesh = new THREE.Mesh(playerGeo, playerMat);
+  playerMesh.position.set(player.x, player.y, 1);
+  scene.add(playerMesh);
+
+  const GRAVITY = -34, JUMP_V = 11.5, MOVE_SPEED = 6;
+
+  function overlapRange(center, half){
+    return [Math.floor(center-half+0.5), Math.floor(center+half+0.5)];
+  }
+  function collidesWorld(x,y){
+    const [colMin,colMax] = overlapRange(x, player.hw);
+    const rowSpaceCenter = -y;
+    const [rowMin,rowMax] = overlapRange(rowSpaceCenter, player.hh);
+    for(let c=colMin;c<=colMax;c++){
+      for(let r=rowMin;r<=rowMax;r++){
+        if(isSolidTile(c,r)) return true;
+      }
+    }
+    return false;
+  }
+
+  /* ---------------- input ---------------- */
+  const keys = {};
+  let jumpQueued = false;
+  window.addEventListener('keydown', (e)=>{
+    keys[e.code] = true;
+    if(e.code === 'Space') jumpQueued = true;
+    if(e.code === 'KeyE') tryInteract();
+    if(e.code === 'Digit1') selectSlot(0);
+    if(e.code === 'Digit2') selectSlot(1);
+  });
+  window.addEventListener('keyup', (e)=>{ keys[e.code] = false; });
+
+  /* ---------------- mouse: mine / place ---------------- */
+  const raycaster = new THREE.Raycaster();
+  const mouseNDC = new THREE.Vector2();
+  window.addEventListener('mousemove', (e)=>{
+    mouseNDC.x = (e.clientX/window.innerWidth)*2-1;
+    mouseNDC.y = -(e.clientY/window.innerHeight)*2+1;
+  });
+  function getWorldMouse(){
+    raycaster.setFromCamera(mouseNDC, camera);
+    const origin = raycaster.ray.origin, dir = raycaster.ray.direction;
+    const t = dir.z !== 0 ? -origin.z/dir.z : 0;
+    return { x: origin.x + dir.x*t, y: origin.y + dir.y*t };
+  }
+  function worldToTile(pt){ return { col: Math.round(pt.x), row: Math.round(-pt.y) }; }
+
+  const REACH = 4.2;
+  const inventory = { dirt:0, stone:0 };
+  let selectedSlot = 0; // 0 dirt, 1 stone
+  const slotEls = Array.from(document.querySelectorAll('.slot'));
+  function selectSlot(i){ selectedSlot = i; slotEls.forEach((s,idx)=> s.classList.toggle('active', idx===i)); sfx.tick(); }
+  function updateInvUI(){
+    document.getElementById('countDirt').textContent = inventory.dirt;
+    document.getElementById('countStone').textContent = inventory.stone;
+  }
+
+  window.addEventListener('mousedown', (e)=>{
+    if(!gameStarted || paused) return;
+    const pt = getWorldMouse();
+    const dist = Math.hypot(pt.x-player.x, pt.y-player.y);
+    if(dist > REACH) return;
+    const {col,row} = worldToTile(pt);
+    if(col<0||col>=W||row<0||row>=H) return;
+
+    if(e.button === 0){ // mine
+      const t = tiles[col][row];
+      if(t && t !== TYPE.BEDROCK){
+        removeTile(col,row);
+        if(t===TYPE.GRASS || t===TYPE.DIRT) inventory.dirt++;
+        else if(t===TYPE.STONE) inventory.stone++;
+        updateInvUI();
+        sfx.mine();
+      }
+    } else if(e.button === 2){ // place
+      if(tiles[col][row] === null){
+        const key = selectedSlot===0 ? 'dirt' : 'stone';
+        if(inventory[key] > 0){
+          inventory[key]--;
+          addTileMesh(col,row, selectedSlot===0 ? TYPE.DIRT : TYPE.STONE);
+          updateInvUI();
+          sfx.place();
+        }
+      }
+    }
+  });
+  window.addEventListener('contextmenu', (e)=> e.preventDefault());
+  slotEls.forEach((s,i)=> s.style.pointerEvents='none'); // hotbar visual only, keys select
+
+  /* ============================================================
+     COLLECTIBLES: MEMORY SHARDS
+  ============================================================ */
+  const letterLines = [
+    "Five months in and we still don't have a single photo together — but somehow that's kind of us. We're not a highlight reel, we're the real thing.",
+    "Inside jokes, arguments about whether avocado and yoghurt should ever be in the same sentence, and you being weirdly serious about lemons never touching your plate.",
+    "You watch anime like it's a personality trait, you rap along to bars you've clearly had memorized since high school, and you wear green like it's a uniform.",
+    "All of that is exactly why this exists — not because you need a website to know you're loved, but because 21 deserved more than a text.",
+    "Here's to the next chapter being just as chaotic, just as green, and hopefully — finally — with an actual photo of us in it. Happy 21st, Maggot."
+  ];
+  const shardCols = [10, 24, 38, 52, 63];
+  const shardDepths = [2, 5, 8, 6, 3];
+  const shardGeo = new THREE.PlaneGeometry(0.5,0.5);
+  const shardMat = new THREE.MeshBasicMaterial({ color:0x8fe3a6 });
+  const shards = shardCols.map((c,i)=>{
+    const sY = surfaceY(c);
+    const row = Math.min(sY + shardDepths[i], BEDROCK-1);
+    const mesh = new THREE.Mesh(shardGeo, shardMat.clone());
+    mesh.position.set(c, -row, 1);
+    scene.add(mesh);
+    // carve a tiny pocket so it's visible once dug into
+    if(tiles[c] && tiles[c][row] !== undefined){ /* keep surrounding solid; player must mine to it */ }
+    return { mesh, col:c, row, collected:false, line: letterLines[i] };
+  });
+  let shardsCollected = 0;
+  document.getElementById('shardCounter').textContent = 'SHARDS: 0 / ' + shards.length;
+
+  /* ============================================================
+     INTERACTIVE STRUCTURES
+  ============================================================ */
+  const structGeo = new THREE.PlaneGeometry(0.9,1.1);
+  const terminalMat = new THREE.MeshBasicMaterial({ color:0x3c8562 });
+  const chestMat = new THREE.MeshBasicMaterial({ color:0x8fe3a6 });
+
+  const terminalCol = 6, terminalRow = surfaceY(terminalCol)-1;
+  const terminal = new THREE.Mesh(structGeo, terminalMat);
+  terminal.position.set(terminalCol, -terminalRow, 1);
+  scene.add(terminal);
+
+  const chestCol = 58, chestRow = surfaceY(chestCol)-1;
+  const chest = new THREE.Mesh(structGeo, chestMat);
+  chest.position.set(chestCol, -chestRow, 1);
+  scene.add(chest);
+
+  const interactPrompt = document.getElementById('interactPrompt');
+  let nearStruct = null;
+
+  function tryInteract(){
+    if(!nearStruct || paused) return;
+    if(nearStruct === 'terminal') openModal('modalArchive');
+    else if(nearStruct === 'chest') openModal('modalSubject', runStatBars);
+  }
+
+  /* ============================================================
+     HAZARDS: LEMONS
+  ============================================================ */
+  const lemonGeo = new THREE.PlaneGeometry(0.5,0.5);
+  const lemonMat = new THREE.MeshBasicMaterial({ color:0xd9d24a });
+  function makeLemon(centerCol, range){
+    const row = surfaceY(centerCol)-1;
+    const mesh = new THREE.Mesh(lemonGeo, lemonMat);
+    mesh.position.set(centerCol, -row, 1);
+    scene.add(mesh);
+    return { mesh, baseCol:centerCol, row, range, dir:1, speed: 1.2 + Math.random()*0.6 };
+  }
+  const lemons = [ makeLemon(16, 4), makeLemon(44, 5), makeLemon(30, 3) ];
+
+  /* ============================================================
+     PICKUPS: AVOCADO + YOGHURT
+  ============================================================ */
+  const avoGeo = new THREE.PlaneGeometry(0.5,0.5);
+  const avoMat = new THREE.MeshBasicMaterial({ color:0x5a8f3c });
+  const yogGeo = new THREE.PlaneGeometry(0.5,0.5);
+  const yogMat = new THREE.MeshBasicMaterial({ color:0xf0ece0 });
+
+  function makePickup(col, geo, mat, kind){
+    const row = surfaceY(col)-1;
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(col, -row, 1);
+    scene.add(mesh);
+    return { mesh, col, row, kind, active:true };
+  }
+  const pickups = [
+    makePickup(20, avoGeo, avoMat, 'avocado'),
+    makePickup(50, yogGeo, yogMat, 'yoghurt')
+  ];
+
+  /* ============================================================
+     GAME LOOP
+  ============================================================ */
+  let gameStarted = false, paused = false;
+  const clock = new THREE.Clock();
+  let elapsed = 0;
+  const DAY_LENGTH = 100;
+
+  function startGame(){
+    gameStarted = true;
+    animate();
+  }
+
+  function updatePlayerPhysics(dt){
+    let inputX = 0;
+    if(keys['KeyA']||keys['ArrowLeft']) inputX -= 1;
+    if(keys['KeyD']||keys['ArrowRight']) inputX += 1;
+    player.vx = inputX * MOVE_SPEED * player.speedMult;
+    if(inputX !== 0) player.facing = inputX;
+
+    if(jumpQueued && player.grounded){
+      player.vy = JUMP_V * player.jumpMult;
+      player.grounded = false;
+    }
+    jumpQueued = false;
+
+    // horizontal
+    const newX = player.x + player.vx*dt;
+    if(!collidesWorld(newX, player.y)) player.x = newX;
+
+    // vertical
+    player.vy += GRAVITY*dt;
+    const newY = player.y + player.vy*dt;
+    if(!collidesWorld(player.x, newY)){
+      player.y = newY; player.grounded = false;
+    } else {
+      if(player.vy < 0) player.grounded = true;
+      player.vy = 0;
+    }
+
+    playerMesh.position.set(player.x, player.y, 1);
+    playerMesh.scale.x = player.facing >= 0 ? 1 : -1;
+
+    if(player.invuln > 0) player.invuln -= dt;
+  }
+
+  function updateCamera(){
+    camera.position.x += (player.x - camera.position.x) * 0.08;
+    camera.position.y += ((player.y+1) - camera.position.y) * 0.08;
+  }
+
+  function updateDayNight(dt){
+    elapsed += dt;
+    const t = (elapsed % DAY_LENGTH)/DAY_LENGTH;
+    const factor = (Math.sin(t*Math.PI*2 - Math.PI/2)+1)/2; // 0 midnight .. 1 noon
+    scene.background = dayColor.clone().lerp(nightColor, 1-factor);
+    starMat.opacity = Math.max(0, 1-factor-0.2) * 0.8;
+  }
+
+  function updateShards(){
+    if(paused) return;
+    shards.forEach(s=>{
+      if(s.collected) return;
+      const dist = Math.hypot(s.mesh.position.x-player.x, s.mesh.position.y-player.y);
+      if(dist < 0.7){
+        s.collected = true;
+        scene.remove(s.mesh);
+        shardsCollected++;
+        document.getElementById('shardCounter').textContent = 'SHARDS: '+shardsCollected+' / '+shards.length;
+        sfx.collect();
+        showToast('MEMORY SHARD — "'+s.line.slice(0,60)+(s.line.length>60?'...':'')+'"', 3400);
+        if(shardsCollected === shards.length){
+          setTimeout(triggerFinale, 1200);
+        }
+      } else if(dist < REACH+2){
+        // gentle glow bob
+        s.mesh.rotation.z += 0.02;
+      }
+    });
+  }
+
+  function updateStructures(){
+    const dT = Math.hypot(terminal.position.x-player.x, terminal.position.y-player.y);
+    const dC = Math.hypot(chest.position.x-player.x, chest.position.y-player.y);
+    if(dT < 1.1){ nearStruct='terminal'; showPrompt(terminal.position, '[E] OPEN THE ARCHIVE'); }
+    else if(dC < 1.1){ nearStruct='chest'; showPrompt(chest.position, '[E] OPEN SUBJECT FILE'); }
+    else { nearStruct=null; interactPrompt.classList.remove('show'); }
+  }
+  function showPrompt(pos3, text){
+    interactPrompt.textContent = text;
+    interactPrompt.classList.add('show');
+    const v = pos3.clone().project(camera);
+    const sx = (v.x*0.5+0.5)*window.innerWidth;
+    const sy = (1-(v.y*0.5+0.5))*window.innerHeight;
+    interactPrompt.style.left = sx+'px';
+    interactPrompt.style.top = (sy-24)+'px';
+  }
+
+  function updateLemons(dt){
+    lemons.forEach(l=>{
+      if(paused) return;
+      l.mesh.position.x += l.dir*l.speed*dt;
+      if(l.mesh.position.x > l.baseCol+l.range || l.mesh.position.x < l.baseCol-l.range) l.dir *= -1;
+      const dist = Math.hypot(l.mesh.position.x-player.x, l.mesh.position.y-player.y);
+      if(dist < 0.55 && player.invuln <= 0){
+        player.invuln = 1.1;
+        player.vx = (player.x < l.mesh.position.x ? -1 : 1) * 4;
+        player.x += player.vx*0.05;
+        player.vy = 6;
+        sfx.hit();
+        doFlash('hit');
+        showToast('ugh... lemon.', 1500);
+      }
+    });
+  }
+
+  function updatePickups(){
+    pickups.forEach(p=>{
+      if(!p.active || paused) return;
+      const dist = Math.hypot(p.mesh.position.x-player.x, p.mesh.position.y-player.y);
+      if(dist < 0.6){
+        p.active = false;
+        scene.remove(p.mesh);
+        sfx.buff();
+        if(p.kind === 'avocado'){
+          player.jumpMult = 1.35;
+          showToast('AVOCADO — jump boost for 12s', 2000);
+          setTimeout(()=>{ player.jumpMult = 1; }, 12000);
+        } else {
+          player.speedMult = 1.5;
+          showToast('YOGHURT — speed boost for 12s', 2000);
+          setTimeout(()=>{ player.speedMult = 1; }, 12000);
+        }
+      }
+    });
+  }
+
+  function animate(){
+    if(!gameStarted) return;
+    requestAnimationFrame(animate);
+    const dt = Math.min(clock.getDelta(), 0.05);
+    if(!paused){
+      updatePlayerPhysics(dt);
+      updateLemons(dt);
+      updateShards();
+      updatePickups();
+    }
+    updateStructures();
+    updateCamera();
+    updateDayNight(dt);
+    renderer.render(scene, camera);
+  }
+
+  /* ============================================================
+     MODALS
+  ============================================================ */
+  function openModal(id, onOpen){
+    paused = true;
+    document.getElementById(id).classList.add('open');
+    if(onOpen) onOpen();
+  }
+  function closeModal(id){
+    paused = false;
+    document.getElementById(id).classList.remove('open');
+  }
+  document.getElementById('closeSubject').addEventListener('click', ()=> closeModal('modalSubject'));
+  document.getElementById('closeArchive').addEventListener('click', ()=> closeModal('modalArchive'));
+
+  let statsRun = false;
+  function runStatBars(){
+    if(statsRun) return; statsRun = true;
+    document.querySelectorAll('#modalSubject .stat').forEach((el,i)=>{
+      const pct = el.dataset.pct, fill = el.querySelector('.stat-fill');
+      setTimeout(()=>{ fill.style.width = pct+'%'; }, 120+i*140);
+    });
+  }
+
+  /* ---------------- gallery / cloudinary ---------------- */
+  const galleryGrid = document.getElementById('galleryGrid');
+  const emptyTile = document.getElementById('emptyTile');
+  const lightbox = document.getElementById('lightbox');
+  const lightboxContent = document.getElementById('lightboxContent');
+
+  function bindTile(tile){
+    tile.addEventListener('click', ()=>{
+      const src = tile.getAttribute('data-full');
+      const isVideo = tile.querySelector('video') !== null;
+      lightboxContent.innerHTML = isVideo
+        ? '<video src="'+src+'" controls autoplay style="max-width:100%;max-height:70vh;"></video>'
+        : '<img src="'+src+'" alt="" style="max-width:100%;max-height:70vh;">';
+      lightbox.classList.add('open');
+    });
+  }
+  document.querySelectorAll('.g-tile[data-full]').forEach(bindTile);
+  document.getElementById('lightboxClose').addEventListener('click', ()=> lightbox.classList.remove('open'));
+
+  function addImageToGrid(url){
+    const tile = document.createElement('div');
+    tile.className = 'g-tile';
+    tile.setAttribute('data-full', url);
+    tile.innerHTML = '<img src="'+url+'" alt="Added to the archive" loading="lazy">';
+    bindTile(tile);
+    galleryGrid.insertBefore(tile, emptyTile);
+    const saved = JSON.parse(localStorage.getItem('archiveUploads')||'[]');
+    saved.push(url);
+    localStorage.setItem('archiveUploads', JSON.stringify(saved));
+  }
+  (function restoreUploads(){
+    const saved = JSON.parse(localStorage.getItem('archiveUploads')||'[]');
+    saved.forEach(url => addImageToGrid(url));
+  })();
+
+  document.getElementById('uploadBtn').addEventListener('click', ()=>{
+    if(CLOUDINARY_CLOUD_NAME === "YOUR_CLOUD_NAME"){
+      alert('Cloudinary is not configured yet — add your cloud name and upload preset in the script section of this file.');
+      return;
+    }
+    const widget = cloudinary.createUploadWidget({
+      cloudName: CLOUDINARY_CLOUD_NAME, uploadPreset: CLOUDINARY_UPLOAD_PRESET,
+      sources:['local','camera'], multiple:true, folder:'maggot-21st-archive',
+      styles:{ palette:{ window:'#0e140f', windowBorder:'#3c8562', tabIcon:'#8fe3a6', menuIcons:'#8fa396',
+        textDark:'#090c09', textLight:'#e9efe7', link:'#8fe3a6', action:'#8fe3a6', inactiveTabIcon:'#8fa396',
+        error:'#e3806f', inProgress:'#8fe3a6', complete:'#8fe3a6', sourceBg:'#121a14' } }
+    }, (error, result)=>{
+      if(!error && result && result.event === 'success') addImageToGrid(result.info.secure_url);
+    });
+    widget.open();
+  });
+
+  /* ============================================================
+     FINALE
+  ============================================================ */
+  function triggerFinale(){
+    paused = true;
+    sfx.levelup();
+    document.getElementById('finalLetter').textContent = letterLines.join(' ');
+    document.getElementById('finale').classList.add('open');
+    const lvlNum = document.getElementById('lvlNum');
+    let n=0; const target=21; const iv = setInterval(()=>{
+      n++; lvlNum.textContent = n;
+      if(n>=target) clearInterval(iv);
+    }, prefersReduced?0:40);
+  }
+  document.getElementById('replayBtn').addEventListener('click', ()=>{
+    window.location.reload();
+  });
+
+})();
+</script>
+
+</body>
+</html>
