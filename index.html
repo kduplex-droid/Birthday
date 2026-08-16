@@ -652,8 +652,8 @@
   startBtn.addEventListener('click', ()=>{
     sfx.start();
     bootEl.classList.add('hide');
-    inMenu = false;
     paused = false;
+    startGame();
   });
 
   /* ============================================================
@@ -952,7 +952,9 @@
   const DAY_LENGTH = 100;
 
   function startGame(){
+    if(gameStarted) return;
     gameStarted = true;
+    clock.getDelta(); // reset delta so the paused boot time doesn't cause a big first jump
     animate();
   }
 
