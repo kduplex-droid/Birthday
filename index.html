@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Chapter 21 — Maggot</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -129,6 +129,38 @@
     pointer-events:auto;
   }
   .hud-btn:hover{ border-color:var(--green-bright); color:var(--green-bright); }
+  #settingsBtn{
+    background:rgba(14,20,15,0.72); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
+    box-shadow:0 0 0 1px rgba(0,0,0,0.25);
+  }
+
+  /* ============================================================
+     TOUCH CONTROLS (mobile)
+  ============================================================ */
+  .touch-controls{ display:none; }
+  body.is-touch .touch-controls{ display:block; }
+  body.is-touch .controls-hint{ display:none; }
+  .tc-btn{
+    position:fixed; z-index:246; border-radius:50%;
+    background:rgba(14,20,15,0.72); border:1.5px solid var(--line); color:var(--green-bright);
+    font-family:var(--mono); display:flex; align-items:center; justify-content:center;
+    -webkit-user-select:none; user-select:none; touch-action:none; cursor:pointer;
+    backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);
+  }
+  .tc-btn:active, .tc-btn.pressed{ background:rgba(143,227,166,0.28); border-color:var(--green-bright); }
+  .tc-move{ width:60px; height:60px; font-size:22px; bottom:calc(26px + env(safe-area-inset-bottom)); }
+  .tc-left{ left:18px; }
+  .tc-right{ left:88px; }
+  .tc-jump{ width:74px; height:74px; font-size:12px; letter-spacing:0.08em; right:18px; bottom:calc(26px + env(safe-area-inset-bottom)); }
+  .tc-interact{ width:52px; height:52px; font-size:11px; right:108px; bottom:calc(40px + env(safe-area-inset-bottom)); }
+  .tc-tool{ width:52px; height:52px; font-size:20px; right:18px; bottom:calc(112px + env(safe-area-inset-bottom)); }
+  .tc-tool.place-mode{ color:var(--lemon); border-color:var(--lemon); }
+  .tc-hint{
+    position:fixed; z-index:246; left:50%; transform:translateX(-50%);
+    bottom:calc(96px + env(safe-area-inset-bottom));
+    font-family:var(--mono); font-size:10px; color:var(--text-muted); letter-spacing:0.04em;
+    background:rgba(14,20,15,0.6); padding:5px 10px; border-radius:3px; pointer-events:none; text-align:center;
+  }
 
   .hotbar{
     position:fixed; bottom:22px; left:50%; transform:translateX(-50%); z-index:250;
@@ -196,21 +228,12 @@
   .tag-list{ display:flex; flex-wrap:wrap; gap:8px; margin-top:20px; }
   .tag{ font-family:var(--mono); font-size:11px; padding:5px 10px; border:1px solid var(--green-deep); border-radius:2px; }
 
-  /* archive */
-  .archive-note{ margin-top:14px; color:var(--text-muted); font-size:14px; line-height:1.7; }
-  .archive-note b{ color:var(--text); }
   .archive-btn{
     margin-top:18px; background:transparent; border:1.5px solid var(--green-bright); color:var(--green-bright);
     font-family:var(--mono); font-size:11.5px; letter-spacing:0.12em; text-transform:uppercase;
     padding:11px 18px; border-radius:2px; cursor:pointer; transition:background .3s,color .3s;
   }
   .archive-btn:hover{ background:var(--green-bright); color:var(--void); }
-  .g-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:22px; }
-  .g-tile{ position:relative; aspect-ratio:4/5; overflow:hidden; background:var(--panel-2); border:1px solid var(--line); cursor:pointer; }
-  .g-tile img,.g-tile video{ width:100%; height:100%; object-fit:cover; }
-  .g-tile.empty{ display:flex; align-items:center; justify-content:center; border:1px dashed var(--line); }
-  .g-tile.empty .plus{ font-family:var(--mono); font-size:10px; color:var(--text-muted); text-align:center; padding:0 8px; }
-
   /* ============================================================
      FINALE
   ============================================================ */
@@ -256,7 +279,6 @@
 
   @media(max-width:640px){
     .controls-hint{ display:none; }
-    .g-grid{ grid-template-columns:repeat(2,1fr); }
   }
 </style>
 </head>
@@ -309,6 +331,15 @@
   <div class="slot" data-slot="1"><span class="key">2</span><span class="swatch" style="background:#7d7d84;"></span><span class="count" id="countStone">0</span></div>
 </div>
 
+<div class="touch-controls">
+  <div class="tc-hint">TAP WORLD TO DIG · TOGGLE 🧱 TO PLACE</div>
+  <button class="tc-btn tc-move tc-left" id="tcLeft" aria-label="Move left">◀</button>
+  <button class="tc-btn tc-move tc-right" id="tcRight" aria-label="Move right">▶</button>
+  <button class="tc-btn tc-tool" id="tcTool" aria-label="Toggle mine/place">⛏</button>
+  <button class="tc-btn tc-interact" id="tcInteract" aria-label="Interact">E</button>
+  <button class="tc-btn tc-jump" id="tcJump" aria-label="Jump">JUMP</button>
+</div>
+
 <div class="interact-prompt" id="interactPrompt"></div>
 <div class="toast" id="toast"></div>
 
@@ -331,26 +362,6 @@
     <div class="stat" data-pct="97"><div class="stat-row"><span>BARS MEMORIZED (EM / MAC / YE / KENDRICK)</span><span class="val">97%</span></div><div class="stat-track"><div class="stat-fill"></div></div></div>
     <div class="tag-list">
       <span class="tag">One Piece</span><span class="tag">Attack on Titan</span><span class="tag">Invincible</span><span class="tag">The Boys</span>
-    </div>
-  </div>
-</div>
-
-<!-- ARCHIVE MODAL -->
-<div class="modal" id="modalArchive">
-  <div class="modal-panel">
-    <button class="modal-close" id="closeArchive">CLOSE ✕</button>
-    <div class="modal-eyebrow">Chapter 02 — Where It Started</div>
-    <h2 class="modal-title">The Archive</h2>
-    <p class="archive-note">
-      Five months in, and there still isn't a single photo of the two of us together — <b>yet</b>.
-      What we do have is this: the first spot we ever hung out. Add a photo if you were there.
-    </p>
-    <button class="archive-btn" id="uploadBtn">+ Upload a Photo</button>
-    <div class="g-grid" id="galleryGrid">
-      <div class="g-tile" data-full="REPLACE_WITH_IMAGE_1.jpg"><img src="REPLACE_WITH_IMAGE_1.jpg" alt="The first spot, photo one" loading="lazy"></div>
-      <div class="g-tile" data-full="REPLACE_WITH_IMAGE_2.jpg"><img src="REPLACE_WITH_IMAGE_2.jpg" alt="The first spot, photo two" loading="lazy"></div>
-      <div class="g-tile" data-full="REPLACE_WITH_VIDEO_1.mp4"><video src="REPLACE_WITH_VIDEO_1.mp4" muted loop playsinline></video></div>
-      <div class="g-tile empty" id="emptyTile"><div class="plus">+<br>add yours</div></div>
     </div>
   </div>
 </div>
@@ -400,14 +411,6 @@
   </div>
 </div>
 
-<!-- LIGHTBOX -->
-<div class="modal" id="lightbox">
-  <div class="modal-panel" style="max-width:80vw; padding:20px; text-align:center;">
-    <button class="modal-close" id="lightboxClose">CLOSE ✕</button>
-    <div id="lightboxContent"></div>
-  </div>
-</div>
-
 <!-- FINALE -->
 <div id="finale">
   <div>
@@ -420,7 +423,6 @@
     </div>
     <div class="ach-list" id="achList">
       <div class="ach"><span class="check">✓</span>Found all 5 memory shards</div>
-      <div class="ach"><span class="check">✓</span>Read the archive at the terminal</div>
       <div class="ach"><span class="check">✓</span>Opened the subject file</div>
       <div class="ach"><span class="check">✓</span>Survived the lemon patrol</div>
       <div class="ach"><span class="check">✓</span>Officially unlocked: Age 21</div>
@@ -436,15 +438,8 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://upload-widget.cloudinary.com/global/all.js"></script>
 <script>
 (function(){
-  /* ============================================================
-     CLOUDINARY CONFIG — replace with your real values
-  ============================================================ */
-  const CLOUDINARY_CLOUD_NAME    = "gmxwgxmw";
-  const CLOUDINARY_UPLOAD_PRESET = "Birthday";
-
   const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   /* ---------------- audio ---------------- */
@@ -529,7 +524,6 @@
     if(typeof playerMat!=='undefined') playerMat.color.setHex(accentNum);
     if(typeof shardMat!=='undefined') shardMat.color.setHex(accentNum);
     if(typeof chestMat!=='undefined') chestMat.color.setHex(accentNum);
-    if(typeof terminalMat!=='undefined') terminalMat.color.setHex(midNum);
     if(typeof mats!=='undefined' && mats[1]) mats[1].color.setHex(midNum); // grass tiles
     if(typeof dayColor!=='undefined') dayColor.set(shade(voidColor, 34));
     if(typeof nightColor!=='undefined') nightColor.set(voidColor);
@@ -821,37 +815,104 @@
     document.getElementById('countStone').textContent = inventory.stone;
   }
 
+  function mineAt(col,row){
+    const t = tiles[col][row];
+    if(t && t !== TYPE.BEDROCK){
+      removeTile(col,row);
+      if(t===TYPE.GRASS || t===TYPE.DIRT) inventory.dirt++;
+      else if(t===TYPE.STONE) inventory.stone++;
+      updateInvUI();
+      sfx.mine();
+    }
+  }
+  function placeAt(col,row){
+    if(tiles[col][row] === null){
+      const key = selectedSlot===0 ? 'dirt' : 'stone';
+      if(inventory[key] > 0){
+        inventory[key]--;
+        addTileMesh(col,row, selectedSlot===0 ? TYPE.DIRT : TYPE.STONE);
+        updateInvUI();
+        sfx.place();
+      }
+    }
+  }
+
+  const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0 || window.matchMedia('(pointer: coarse)').matches;
+  if(isTouchDevice) document.body.classList.add('is-touch');
+  let lastTouchActionTime = 0;
+
   window.addEventListener('mousedown', (e)=>{
     if(!gameStarted || paused) return;
+    if(Date.now() - lastTouchActionTime < 600) return; // ignore synthetic mouse events following a touch
     const pt = getWorldMouse();
     const dist = Math.hypot(pt.x-player.x, pt.y-player.y);
     if(dist > REACH) return;
     const {col,row} = worldToTile(pt);
     if(col<0||col>=W||row<0||row>=H) return;
 
-    if(e.button === 0){ // mine
-      const t = tiles[col][row];
-      if(t && t !== TYPE.BEDROCK){
-        removeTile(col,row);
-        if(t===TYPE.GRASS || t===TYPE.DIRT) inventory.dirt++;
-        else if(t===TYPE.STONE) inventory.stone++;
-        updateInvUI();
-        sfx.mine();
-      }
-    } else if(e.button === 2){ // place
-      if(tiles[col][row] === null){
-        const key = selectedSlot===0 ? 'dirt' : 'stone';
-        if(inventory[key] > 0){
-          inventory[key]--;
-          addTileMesh(col,row, selectedSlot===0 ? TYPE.DIRT : TYPE.STONE);
-          updateInvUI();
-          sfx.place();
-        }
-      }
-    }
+    if(e.button === 0) mineAt(col,row);
+    else if(e.button === 2) placeAt(col,row);
   });
   window.addEventListener('contextmenu', (e)=> e.preventDefault());
-  slotEls.forEach((s,i)=> s.style.pointerEvents='none'); // hotbar visual only, keys select
+  slotEls.forEach((s,i)=> s.style.pointerEvents='none'); // hotbar visual only, keys/taps select
+
+  /* ---------------- touch controls (mobile) ---------------- */
+  function bindHold(id, onDown, onUp){
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.addEventListener('touchstart', (e)=>{ e.preventDefault(); el.classList.add('pressed'); onDown(); }, {passive:false});
+    const release = (e)=>{ e.preventDefault(); el.classList.remove('pressed'); if(onUp) onUp(); };
+    el.addEventListener('touchend', release, {passive:false});
+    el.addEventListener('touchcancel', release, {passive:false});
+  }
+  bindHold('tcLeft', ()=>{ keys['KeyA']=true; }, ()=>{ keys['KeyA']=false; });
+  bindHold('tcRight', ()=>{ keys['KeyD']=true; }, ()=>{ keys['KeyD']=false; });
+  bindHold('tcJump', ()=>{ jumpQueued = true; });
+
+  const tcInteractEl = document.getElementById('tcInteract');
+  if(tcInteractEl){
+    tcInteractEl.addEventListener('touchstart', (e)=>{ e.preventDefault(); tcInteractEl.classList.add('pressed'); tryInteract(); }, {passive:false});
+    tcInteractEl.addEventListener('touchend', (e)=>{ e.preventDefault(); tcInteractEl.classList.remove('pressed'); }, {passive:false});
+  }
+
+  let touchToolMode = 'mine';
+  const tcToolEl = document.getElementById('tcTool');
+  if(tcToolEl){
+    tcToolEl.addEventListener('touchstart', (e)=>{
+      e.preventDefault();
+      touchToolMode = touchToolMode === 'mine' ? 'place' : 'mine';
+      tcToolEl.textContent = touchToolMode === 'mine' ? '⛏' : '🧱';
+      tcToolEl.classList.toggle('place-mode', touchToolMode === 'place');
+      sfx.tick();
+    }, {passive:false});
+  }
+
+  // tapping directly on the world mines or places, depending on the selected tool
+  canvas.addEventListener('touchstart', (e)=>{
+    if(!gameStarted || paused) return;
+    if(e.touches.length !== 1) return;
+    lastTouchActionTime = Date.now();
+    const t = e.touches[0];
+    mouseNDC.x = (t.clientX/window.innerWidth)*2-1;
+    mouseNDC.y = -(t.clientY/window.innerHeight)*2+1;
+    const pt = getWorldMouse();
+    const dist = Math.hypot(pt.x-player.x, pt.y-player.y);
+    if(dist > REACH) return;
+    const {col,row} = worldToTile(pt);
+    if(col<0||col>=W||row<0||row>=H) return;
+    if(touchToolMode === 'mine') mineAt(col,row);
+    else placeAt(col,row);
+  }, {passive:true});
+
+  // tapping a hotbar slot selects it on touch devices
+  slotEls.forEach((s,i)=>{
+    s.addEventListener('touchstart', (e)=>{
+      e.preventDefault();
+      lastTouchActionTime = Date.now();
+      selectSlot(i);
+    }, {passive:false});
+  });
+  if(isTouchDevice) slotEls.forEach(s=> s.style.pointerEvents='auto');
 
   /* ============================================================
      COLLECTIBLES: MEMORY SHARDS
@@ -884,13 +945,7 @@
      INTERACTIVE STRUCTURES
   ============================================================ */
   const structGeo = new THREE.PlaneGeometry(0.9,1.1);
-  const terminalMat = new THREE.MeshBasicMaterial({ color:0x3c8562 });
   const chestMat = new THREE.MeshBasicMaterial({ color:0x8fe3a6 });
-
-  const terminalCol = 6, terminalRow = surfaceY(terminalCol)-1;
-  const terminal = new THREE.Mesh(structGeo, terminalMat);
-  terminal.position.set(terminalCol, -terminalRow, 1);
-  scene.add(terminal);
 
   const chestCol = 58, chestRow = surfaceY(chestCol)-1;
   const chest = new THREE.Mesh(structGeo, chestMat);
@@ -902,8 +957,7 @@
 
   function tryInteract(){
     if(!nearStruct || paused) return;
-    if(nearStruct === 'terminal') openModal('modalArchive');
-    else if(nearStruct === 'chest') openModal('modalSubject', runStatBars);
+    if(nearStruct === 'chest') openModal('modalSubject', runStatBars);
   }
 
   /* ============================================================
@@ -1029,10 +1083,8 @@
   }
 
   function updateStructures(){
-    const dT = Math.hypot(terminal.position.x-player.x, terminal.position.y-player.y);
     const dC = Math.hypot(chest.position.x-player.x, chest.position.y-player.y);
-    if(dT < 1.1){ nearStruct='terminal'; showPrompt(terminal.position, '[E] OPEN THE ARCHIVE'); }
-    else if(dC < 1.1){ nearStruct='chest'; showPrompt(chest.position, '[E] OPEN SUBJECT FILE'); }
+    if(dC < 1.1){ nearStruct='chest'; showPrompt(chest.position, '[E] OPEN SUBJECT FILE'); }
     else { nearStruct=null; interactPrompt.classList.remove('show'); }
   }
   function showPrompt(pos3, text){
@@ -1113,7 +1165,6 @@
     document.getElementById(id).classList.remove('open');
   }
   document.getElementById('closeSubject').addEventListener('click', ()=> closeModal('modalSubject'));
-  document.getElementById('closeArchive').addEventListener('click', ()=> closeModal('modalArchive'));
 
   let statsRun = false;
   function runStatBars(){
@@ -1123,58 +1174,6 @@
       setTimeout(()=>{ fill.style.width = pct+'%'; }, 120+i*140);
     });
   }
-
-  /* ---------------- gallery / cloudinary ---------------- */
-  const galleryGrid = document.getElementById('galleryGrid');
-  const emptyTile = document.getElementById('emptyTile');
-  const lightbox = document.getElementById('lightbox');
-  const lightboxContent = document.getElementById('lightboxContent');
-
-  function bindTile(tile){
-    tile.addEventListener('click', ()=>{
-      const src = tile.getAttribute('data-full');
-      const isVideo = tile.querySelector('video') !== null;
-      lightboxContent.innerHTML = isVideo
-        ? '<video src="'+src+'" controls autoplay style="max-width:100%;max-height:70vh;"></video>'
-        : '<img src="'+src+'" alt="" style="max-width:100%;max-height:70vh;">';
-      lightbox.classList.add('open');
-    });
-  }
-  document.querySelectorAll('.g-tile[data-full]').forEach(bindTile);
-  document.getElementById('lightboxClose').addEventListener('click', ()=> lightbox.classList.remove('open'));
-
-  function addImageToGrid(url){
-    const tile = document.createElement('div');
-    tile.className = 'g-tile';
-    tile.setAttribute('data-full', url);
-    tile.innerHTML = '<img src="'+url+'" alt="Added to the archive" loading="lazy">';
-    bindTile(tile);
-    galleryGrid.insertBefore(tile, emptyTile);
-    const saved = JSON.parse(localStorage.getItem('archiveUploads')||'[]');
-    saved.push(url);
-    localStorage.setItem('archiveUploads', JSON.stringify(saved));
-  }
-  (function restoreUploads(){
-    const saved = JSON.parse(localStorage.getItem('archiveUploads')||'[]');
-    saved.forEach(url => addImageToGrid(url));
-  })();
-
-  document.getElementById('uploadBtn').addEventListener('click', ()=>{
-    if(CLOUDINARY_CLOUD_NAME === "YOUR_CLOUD_NAME"){
-      alert('Cloudinary is not configured yet — add your cloud name and upload preset in the script section of this file.');
-      return;
-    }
-    const widget = cloudinary.createUploadWidget({
-      cloudName: CLOUDINARY_CLOUD_NAME, uploadPreset: CLOUDINARY_UPLOAD_PRESET,
-      sources:['local','camera'], multiple:true, folder:'maggot-21st-archive',
-      styles:{ palette:{ window:'#0e140f', windowBorder:'#3c8562', tabIcon:'#8fe3a6', menuIcons:'#8fa396',
-        textDark:'#090c09', textLight:'#e9efe7', link:'#8fe3a6', action:'#8fe3a6', inactiveTabIcon:'#8fa396',
-        error:'#e3806f', inProgress:'#8fe3a6', complete:'#8fe3a6', sourceBg:'#121a14' } }
-    }, (error, result)=>{
-      if(!error && result && result.event === 'success') addImageToGrid(result.info.secure_url);
-    });
-    widget.open();
-  });
 
   /* ============================================================
      FINALE
