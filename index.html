@@ -228,12 +228,21 @@
   .tag-list{ display:flex; flex-wrap:wrap; gap:8px; margin-top:20px; }
   .tag{ font-family:var(--mono); font-size:11px; padding:5px 10px; border:1px solid var(--green-deep); border-radius:2px; }
 
+  /* archive */
+  .archive-note{ margin-top:14px; color:var(--text-muted); font-size:14px; line-height:1.7; }
+  .archive-note b{ color:var(--text); }
   .archive-btn{
     margin-top:18px; background:transparent; border:1.5px solid var(--green-bright); color:var(--green-bright);
     font-family:var(--mono); font-size:11.5px; letter-spacing:0.12em; text-transform:uppercase;
     padding:11px 18px; border-radius:2px; cursor:pointer; transition:background .3s,color .3s;
   }
   .archive-btn:hover{ background:var(--green-bright); color:var(--void); }
+  .g-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:22px; }
+  .g-tile{ position:relative; aspect-ratio:4/5; overflow:hidden; background:var(--panel-2); border:1px solid var(--line); cursor:pointer; }
+  .g-tile img,.g-tile video{ width:100%; height:100%; object-fit:cover; }
+  .g-tile.empty{ display:flex; align-items:center; justify-content:center; border:1px dashed var(--line); }
+  .g-tile.empty .plus{ font-family:var(--mono); font-size:10px; color:var(--text-muted); text-align:center; padding:0 8px; }
+
   /* ============================================================
      FINALE
   ============================================================ */
@@ -279,6 +288,7 @@
 
   @media(max-width:640px){
     .controls-hint{ display:none; }
+    .g-grid{ grid-template-columns:repeat(2,1fr); }
   }
 </style>
 </head>
@@ -366,6 +376,26 @@
   </div>
 </div>
 
+<!-- ARCHIVE MODAL -->
+<div class="modal" id="modalArchive">
+  <div class="modal-panel">
+    <button class="modal-close" id="closeArchive">CLOSE ✕</button>
+    <div class="modal-eyebrow">Chapter 02 — The Archive</div>
+    <h2 class="modal-title">The Archive</h2>
+    <p class="archive-note">
+      Five months in, and there still isn't a single photo of the two of us together — <b>yet</b>.
+      This is where we're keeping whatever we've got so far. Add one if you have it.
+    </p>
+    <button class="archive-btn" id="uploadBtn">+ Upload a Photo</button>
+    <div class="g-grid" id="galleryGrid">
+      <div class="g-tile" data-full="REPLACE_WITH_IMAGE_1.jpg"><img src="REPLACE_WITH_IMAGE_1.jpg" alt="Archive photo one" loading="lazy"></div>
+      <div class="g-tile" data-full="REPLACE_WITH_IMAGE_2.jpg"><img src="REPLACE_WITH_IMAGE_2.jpg" alt="Archive photo two" loading="lazy"></div>
+      <div class="g-tile" data-full="REPLACE_WITH_VIDEO_1.mp4"><video src="REPLACE_WITH_VIDEO_1.mp4" muted loop playsinline></video></div>
+      <div class="g-tile empty" id="emptyTile"><div class="plus">+<br>add yours</div></div>
+    </div>
+  </div>
+</div>
+
 <!-- SETTINGS MODAL -->
 <div class="modal" id="modalSettings">
   <div class="modal-panel">
@@ -411,6 +441,14 @@
   </div>
 </div>
 
+<!-- LIGHTBOX -->
+<div class="modal" id="lightbox">
+  <div class="modal-panel" style="max-width:80vw; padding:20px; text-align:center;">
+    <button class="modal-close" id="lightboxClose">CLOSE ✕</button>
+    <div id="lightboxContent"></div>
+  </div>
+</div>
+
 <!-- FINALE -->
 <div id="finale">
   <div>
@@ -423,6 +461,7 @@
     </div>
     <div class="ach-list" id="achList">
       <div class="ach"><span class="check">✓</span>Found all 5 memory shards</div>
+      <div class="ach"><span class="check">✓</span>Explored the archive</div>
       <div class="ach"><span class="check">✓</span>Opened the subject file</div>
       <div class="ach"><span class="check">✓</span>Survived the lemon patrol</div>
       <div class="ach"><span class="check">✓</span>Officially unlocked: Age 21</div>
@@ -438,8 +477,15 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://upload-widget.cloudinary.com/global/all.js"></script>
 <script>
 (function(){
+  /* ============================================================
+     CLOUDINARY CONFIG — replace with your real values
+  ============================================================ */
+  const CLOUDINARY_CLOUD_NAME    = "gmxwgxmw";
+  const CLOUDINARY_UPLOAD_PRESET = "Birthday";
+
   const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   /* ---------------- audio ---------------- */
@@ -524,6 +570,7 @@
     if(typeof playerMat!=='undefined') playerMat.color.setHex(accentNum);
     if(typeof shardMat!=='undefined') shardMat.color.setHex(accentNum);
     if(typeof chestMat!=='undefined') chestMat.color.setHex(accentNum);
+    if(typeof terminalMat!=='undefined') terminalMat.color.setHex(midNum);
     if(typeof mats!=='undefined' && mats[1]) mats[1].color.setHex(midNum); // grass tiles
     if(typeof dayColor!=='undefined') dayColor.set(shade(voidColor, 34));
     if(typeof nightColor!=='undefined') nightColor.set(voidColor);
@@ -945,7 +992,13 @@
      INTERACTIVE STRUCTURES
   ============================================================ */
   const structGeo = new THREE.PlaneGeometry(0.9,1.1);
+  const terminalMat = new THREE.MeshBasicMaterial({ color:0x3c8562 });
   const chestMat = new THREE.MeshBasicMaterial({ color:0x8fe3a6 });
+
+  const terminalCol = 6, terminalRow = surfaceY(terminalCol)-1;
+  const terminal = new THREE.Mesh(structGeo, terminalMat);
+  terminal.position.set(terminalCol, -terminalRow, 1);
+  scene.add(terminal);
 
   const chestCol = 58, chestRow = surfaceY(chestCol)-1;
   const chest = new THREE.Mesh(structGeo, chestMat);
@@ -957,7 +1010,8 @@
 
   function tryInteract(){
     if(!nearStruct || paused) return;
-    if(nearStruct === 'chest') openModal('modalSubject', runStatBars);
+    if(nearStruct === 'terminal') openModal('modalArchive');
+    else if(nearStruct === 'chest') openModal('modalSubject', runStatBars);
   }
 
   /* ============================================================
@@ -1083,8 +1137,10 @@
   }
 
   function updateStructures(){
+    const dT = Math.hypot(terminal.position.x-player.x, terminal.position.y-player.y);
     const dC = Math.hypot(chest.position.x-player.x, chest.position.y-player.y);
-    if(dC < 1.1){ nearStruct='chest'; showPrompt(chest.position, '[E] OPEN SUBJECT FILE'); }
+    if(dT < 1.1){ nearStruct='terminal'; showPrompt(terminal.position, '[E] OPEN THE ARCHIVE'); }
+    else if(dC < 1.1){ nearStruct='chest'; showPrompt(chest.position, '[E] OPEN SUBJECT FILE'); }
     else { nearStruct=null; interactPrompt.classList.remove('show'); }
   }
   function showPrompt(pos3, text){
@@ -1165,6 +1221,7 @@
     document.getElementById(id).classList.remove('open');
   }
   document.getElementById('closeSubject').addEventListener('click', ()=> closeModal('modalSubject'));
+  document.getElementById('closeArchive').addEventListener('click', ()=> closeModal('modalArchive'));
 
   let statsRun = false;
   function runStatBars(){
@@ -1174,6 +1231,58 @@
       setTimeout(()=>{ fill.style.width = pct+'%'; }, 120+i*140);
     });
   }
+
+  /* ---------------- gallery / cloudinary ---------------- */
+  const galleryGrid = document.getElementById('galleryGrid');
+  const emptyTile = document.getElementById('emptyTile');
+  const lightbox = document.getElementById('lightbox');
+  const lightboxContent = document.getElementById('lightboxContent');
+
+  function bindTile(tile){
+    tile.addEventListener('click', ()=>{
+      const src = tile.getAttribute('data-full');
+      const isVideo = tile.querySelector('video') !== null;
+      lightboxContent.innerHTML = isVideo
+        ? '<video src="'+src+'" controls autoplay style="max-width:100%;max-height:70vh;"></video>'
+        : '<img src="'+src+'" alt="" style="max-width:100%;max-height:70vh;">';
+      lightbox.classList.add('open');
+    });
+  }
+  document.querySelectorAll('.g-tile[data-full]').forEach(bindTile);
+  document.getElementById('lightboxClose').addEventListener('click', ()=> lightbox.classList.remove('open'));
+
+  function addImageToGrid(url){
+    const tile = document.createElement('div');
+    tile.className = 'g-tile';
+    tile.setAttribute('data-full', url);
+    tile.innerHTML = '<img src="'+url+'" alt="Added to the archive" loading="lazy">';
+    bindTile(tile);
+    galleryGrid.insertBefore(tile, emptyTile);
+    const saved = JSON.parse(localStorage.getItem('archiveUploads')||'[]');
+    saved.push(url);
+    localStorage.setItem('archiveUploads', JSON.stringify(saved));
+  }
+  (function restoreUploads(){
+    const saved = JSON.parse(localStorage.getItem('archiveUploads')||'[]');
+    saved.forEach(url => addImageToGrid(url));
+  })();
+
+  document.getElementById('uploadBtn').addEventListener('click', ()=>{
+    if(CLOUDINARY_CLOUD_NAME === "YOUR_CLOUD_NAME"){
+      alert('Cloudinary is not configured yet — add your cloud name and upload preset in the script section of this file.');
+      return;
+    }
+    const widget = cloudinary.createUploadWidget({
+      cloudName: CLOUDINARY_CLOUD_NAME, uploadPreset: CLOUDINARY_UPLOAD_PRESET,
+      sources:['local','camera'], multiple:true, folder:'maggot-21st-archive',
+      styles:{ palette:{ window:'#0e140f', windowBorder:'#3c8562', tabIcon:'#8fe3a6', menuIcons:'#8fa396',
+        textDark:'#090c09', textLight:'#e9efe7', link:'#8fe3a6', action:'#8fe3a6', inactiveTabIcon:'#8fa396',
+        error:'#e3806f', inProgress:'#8fe3a6', complete:'#8fe3a6', sourceBg:'#121a14' } }
+    }, (error, result)=>{
+      if(!error && result && result.event === 'success') addImageToGrid(result.info.secure_url);
+    });
+    widget.open();
+  });
 
   /* ============================================================
      FINALE
