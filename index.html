@@ -52,14 +52,37 @@
      BOOT
   ============================================================ */
   #boot{
-    position:fixed; inset:0; z-index:500; background:var(--void);
+    position:fixed; inset:0; z-index:500;
+    background:linear-gradient(180deg, rgba(6,9,7,0.38) 0%, rgba(6,9,7,0.72) 55%, rgba(6,9,7,0.94) 100%);
+    backdrop-filter:blur(1.5px) brightness(0.7) saturate(1.1);
+    -webkit-backdrop-filter:blur(1.5px) brightness(0.7) saturate(1.1);
     display:flex; align-items:center; justify-content:center; text-align:center;
-    padding:24px;
+    padding:24px; overflow:hidden;
   }
   #boot.hide{ display:none; }
+
+  .boot-corner{ position:absolute; width:42px; height:42px; border-color:var(--green-bright); opacity:.8; pointer-events:none; transition:border-color .4s; }
+  .boot-corner.tl{ top:20px; left:20px; border-top:2px solid; border-left:2px solid; }
+  .boot-corner.tr{ top:20px; right:20px; border-top:2px solid; border-right:2px solid; }
+  .boot-corner.bl{ bottom:20px; left:20px; border-bottom:2px solid; border-left:2px solid; }
+  .boot-corner.br{ bottom:20px; right:20px; border-bottom:2px solid; border-right:2px solid; }
+
+  .boot-tag{ position:absolute; font-family:var(--mono); font-size:10px; letter-spacing:0.16em; color:var(--green-bright); opacity:.8; white-space:nowrap; }
+  .boot-tag-tl{ top:32px; left:76px; }
+  .boot-tag-tl .dot{ display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--danger); margin-right:6px; animation:recBlink 1.4s ease-in-out infinite; }
+  .boot-tag-tr{ top:32px; right:76px; font-variant-numeric:tabular-nums; }
+  @keyframes recBlink{ 0%,100%{opacity:1;} 50%{opacity:.15;} }
+
+  .boot-scan{
+    position:absolute; left:0; right:0; height:2px; top:-2%;
+    background:linear-gradient(90deg, transparent, var(--green-bright), transparent);
+    opacity:.45; animation:scanSweep 4.2s linear infinite; pointer-events:none;
+  }
+  @keyframes scanSweep{ 0%{ top:-2%; } 100%{ top:102%; } }
+
   .boot-logo{ font-family:var(--mono); font-size:11px; letter-spacing:0.4em; color:var(--text-muted); animation:flicker 3.2s infinite; }
   @keyframes flicker{ 0%,19%,21%,23%,25%,54%,56%,100%{opacity:1;} 20%,24%,55%{opacity:.4;} }
-  .boot-title{ font-family:var(--display); font-weight:400; line-height:0.86; font-size:clamp(52px,13vw,160px); margin-top:16px; }
+  .boot-title{ font-family:var(--display); font-weight:400; line-height:0.86; font-size:clamp(52px,13vw,160px); margin-top:16px; text-shadow:0 0 46px rgba(143,227,166,0.28); }
   .boot-title span{
     display:block; background:linear-gradient(180deg, var(--green-bright), var(--green-mid) 70%);
     -webkit-background-clip:text; background-clip:text; color:transparent;
@@ -69,12 +92,13 @@
   .boot-desc{ margin-top:14px; font-family:var(--mono); font-size:12px; color:var(--text-muted); max-width:46ch; margin-left:auto; margin-right:auto; line-height:1.7; }
   .boot-loading{ margin:40px auto 0; max-width:320px; }
   .boot-loading-label{ font-family:var(--mono); font-size:11px; letter-spacing:0.1em; color:var(--text-muted); margin-bottom:10px; height:16px; }
-  .boot-bar-track{ width:100%; height:3px; background:var(--line); }
-  .boot-bar-fill{ height:100%; width:0%; background:var(--green-bright); }
+  .boot-bar-track{ width:100%; height:3px; background:var(--line); position:relative; }
+  .boot-bar-fill{ height:100%; width:0%; background:var(--green-bright); box-shadow:0 0 10px rgba(143,227,166,0.6); }
   .start-btn{
-    margin-top:40px; background:transparent; border:1.5px solid var(--green-bright); color:var(--green-bright);
-    font-family:var(--mono); font-size:13px; letter-spacing:0.2em; text-transform:uppercase;
-    padding:16px 40px; cursor:pointer; border-radius:2px;
+    margin-top:40px; background:rgba(9,12,9,0.4); border:1.5px solid var(--green-bright); color:var(--green-bright);
+    font-family:var(--mono); font-size:13px; letter-spacing:0.24em; text-transform:uppercase;
+    padding:16px 44px; cursor:pointer;
+    clip-path:polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
     opacity:0; transform:translateY(10px); pointer-events:none;
     transition:opacity .5s var(--ease), transform .5s var(--ease), background .3s, color .3s;
     animation:pulseGlow 2s ease-in-out infinite;
@@ -215,6 +239,21 @@
   }
   .replay-btn:hover{ background:var(--green-bright); color:var(--void); }
 
+  /* ============================================================
+     SETTINGS PANEL
+  ============================================================ */
+  .settings-section{ margin-top:22px; padding-top:18px; border-top:1px solid var(--line); }
+  .settings-section:first-of-type{ margin-top:20px; padding-top:0; border-top:none; }
+  .settings-label{ font-family:var(--mono); font-size:10px; letter-spacing:0.18em; color:var(--text-muted); margin-bottom:12px; }
+  .swatch-row{ display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap; }
+  .theme-swatch{ width:34px; height:34px; border-radius:50%; border:2px solid var(--line); background:var(--sw); cursor:pointer; transition:border-color .2s, transform .2s; }
+  .theme-swatch:hover{ transform:scale(1.08); border-color:var(--text); }
+  .settings-row{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; font-family:var(--mono); font-size:11.5px; color:var(--text-muted); }
+  .settings-row input[type=color]{ width:44px; height:30px; border:1px solid var(--line); border-radius:3px; background:none; cursor:pointer; padding:2px; flex-shrink:0; }
+  .settings-row input[type=text]{ flex:1; background:var(--panel-2); border:1px solid var(--line); color:var(--text); font-family:var(--mono); font-size:11px; padding:8px 10px; border-radius:2px; min-width:0; }
+  .settings-row input[type=file]{ font-family:var(--mono); font-size:10px; color:var(--text-muted); max-width:170px; }
+  .settings-hint{ font-family:var(--mono); font-size:10.5px; color:var(--text-muted); line-height:1.6; margin-top:2px; }
+
   @media(max-width:640px){
     .controls-hint{ display:none; }
     .g-grid{ grid-template-columns:repeat(2,1fr); }
@@ -230,6 +269,13 @@
 
 <!-- BOOT -->
 <div id="boot">
+  <span class="boot-corner tl"></span>
+  <span class="boot-corner tr"></span>
+  <span class="boot-corner bl"></span>
+  <span class="boot-corner br"></span>
+  <div class="boot-tag boot-tag-tl"><span class="dot"></span>LIVE FEED — SECTOR 21</div>
+  <div class="boot-tag boot-tag-tr" id="bootClock">00:00:00</div>
+  <div class="boot-scan"></div>
   <div>
     <div class="boot-logo">A BIRTHDAY EXPERIENCE</div>
     <h1 class="boot-title"><span>CHAPTER</span><span>TWENTY&#8209;ONE</span></h1>
@@ -252,7 +298,10 @@
     <div class="shard-counter" id="shardCounter">SHARDS: 0 / 5</div>
     <div class="controls-hint">A/D move · SPACE jump · CLICK mine · RIGHT-CLICK place · E interact</div>
   </div>
-  <button class="hud-btn" id="muteBtn" aria-label="Toggle sound">🔊</button>
+  <div style="display:flex; gap:8px;">
+    <button class="hud-btn" id="settingsBtn" aria-label="Customize appearance">🎨</button>
+    <button class="hud-btn" id="muteBtn" aria-label="Toggle sound">🔊</button>
+  </div>
 </div>
 
 <div class="hotbar" id="hotbar">
@@ -306,6 +355,51 @@
   </div>
 </div>
 
+<!-- SETTINGS MODAL -->
+<div class="modal" id="modalSettings">
+  <div class="modal-panel">
+    <button class="modal-close" id="closeSettings">CLOSE ✕</button>
+    <div class="modal-eyebrow">Customize</div>
+    <h2 class="modal-title">Appearance</h2>
+
+    <div class="settings-section">
+      <div class="settings-label">ACCENT THEME</div>
+      <div class="swatch-row" id="themeSwatches">
+        <button class="theme-swatch" data-accent="#8fe3a6" data-void="#090c09" style="--sw:#8fe3a6;" title="Green (default)"></button>
+        <button class="theme-swatch" data-accent="#c98fe3" data-void="#0c090f" style="--sw:#c98fe3;" title="Violet"></button>
+        <button class="theme-swatch" data-accent="#8fc7e3" data-void="#090c0f" style="--sw:#8fc7e3;" title="Ice"></button>
+        <button class="theme-swatch" data-accent="#e38f8f" data-void="#0f0909" style="--sw:#e38f8f;" title="Crimson"></button>
+        <button class="theme-swatch" data-accent="#e3d38f" data-void="#0f0d09" style="--sw:#e3d38f;" title="Gold"></button>
+        <button class="theme-swatch" data-accent="#8fe3d3" data-void="#090f0d" style="--sw:#8fe3d3;" title="Teal"></button>
+      </div>
+      <div class="settings-row">
+        <label for="accentPicker">Custom accent colour</label>
+        <input type="color" id="accentPicker" value="#8fe3a6">
+      </div>
+      <div class="settings-row">
+        <label for="voidPicker">Custom base colour</label>
+        <input type="color" id="voidPicker" value="#090c09">
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-label">CUSTOM BACKGROUND</div>
+      <div class="settings-row">
+        <label for="bgUrlInput">Image URL</label>
+        <input type="text" id="bgUrlInput" placeholder="https://...">
+      </div>
+      <div class="settings-row">
+        <label for="bgFileInput">Or upload a file</label>
+        <input type="file" id="bgFileInput" accept="image/*">
+      </div>
+      <p class="settings-hint">Replaces the day/night sky with your image. Large uploads may not be remembered after you close the tab — a URL is more reliable if you want it to stick.</p>
+      <button class="archive-btn" id="clearBgBtn" style="margin-top:12px;">Reset to Default Sky</button>
+    </div>
+
+    <button class="archive-btn" id="resetThemeBtn" style="margin-top:18px;">↻ Reset Everything</button>
+  </div>
+</div>
+
 <!-- LIGHTBOX -->
 <div class="modal" id="lightbox">
   <div class="modal-panel" style="max-width:80vw; padding:20px; text-align:center;">
@@ -348,8 +442,8 @@
   /* ============================================================
      CLOUDINARY CONFIG — replace with your real values
   ============================================================ */
-  const CLOUDINARY_CLOUD_NAME    = "YOUR_CLOUD_NAME";
-  const CLOUDINARY_UPLOAD_PRESET = "YOUR_UPLOAD_PRESET";
+  const CLOUDINARY_CLOUD_NAME    = "gmxwgxmw";
+  const CLOUDINARY_UPLOAD_PRESET = "Birthday";
 
   const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -396,12 +490,148 @@
   }
 
   /* ============================================================
+     APPEARANCE CUSTOMIZATION (theme colours + background image)
+  ============================================================ */
+  function hexToRgb(hex){
+    hex = hex.replace('#','');
+    if(hex.length===3) hex = hex.split('').map(c=>c+c).join('');
+    const num = parseInt(hex,16);
+    return { r:(num>>16)&255, g:(num>>8)&255, b:num&255 };
+  }
+  function rgbToHex(r,g,b){
+    return '#'+[r,g,b].map(v=> Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join('');
+  }
+  function shade(hex, amt){
+    const {r,g,b} = hexToRgb(hex);
+    return rgbToHex(r+amt, g+amt, b+amt);
+  }
+
+  let currentAccent = '#8fe3a6', currentVoidColor = '#090c09';
+  let customBgImage = false, lastBgUrl = '';
+
+  function applyTheme(accent, voidColor){
+    currentAccent = accent; currentVoidColor = voidColor;
+    const mid = shade(accent, -40);
+    const deep = shade(accent, -95);
+    const rgb = hexToRgb(accent);
+    const root = document.documentElement.style;
+    root.setProperty('--green-bright', accent);
+    root.setProperty('--green-mid', mid);
+    root.setProperty('--green-deep', deep);
+    root.setProperty('--void', voidColor);
+    root.setProperty('--panel', shade(voidColor, 8));
+    root.setProperty('--panel-2', shade(voidColor, 14));
+    root.setProperty('--line', `rgba(${rgb.r},${rgb.g},${rgb.b},0.18)`);
+
+    // update in-game 3D elements to match
+    const accentNum = parseInt(accent.replace('#',''),16);
+    const midNum = parseInt(mid.replace('#',''),16);
+    if(typeof playerMat!=='undefined') playerMat.color.setHex(accentNum);
+    if(typeof shardMat!=='undefined') shardMat.color.setHex(accentNum);
+    if(typeof chestMat!=='undefined') chestMat.color.setHex(accentNum);
+    if(typeof terminalMat!=='undefined') terminalMat.color.setHex(midNum);
+    if(typeof mats!=='undefined' && mats[1]) mats[1].color.setHex(midNum); // grass tiles
+    if(typeof dayColor!=='undefined') dayColor.set(shade(voidColor, 34));
+    if(typeof nightColor!=='undefined') nightColor.set(voidColor);
+    if(typeof scene!=='undefined' && !customBgImage) scene.background = dayColor.clone();
+
+    saveThemeToStorage();
+  }
+
+  const bgTextureLoader = new THREE.TextureLoader();
+  function applyBackgroundImage(url){
+    bgTextureLoader.load(url, function(tex){
+      customBgImage = true;
+      lastBgUrl = url;
+      scene.background = tex;
+      saveThemeToStorage();
+    }, undefined, function(){
+      alert("Couldn't load that image — check the URL (or file) and try again.");
+    });
+  }
+  function clearBackgroundImage(){
+    customBgImage = false;
+    lastBgUrl = '';
+    scene.background = dayColor.clone();
+    saveThemeToStorage();
+  }
+
+  function saveThemeToStorage(){
+    try{
+      localStorage.setItem('gameAppearance', JSON.stringify({
+        accent: currentAccent,
+        voidColor: currentVoidColor,
+        bgUrl: customBgImage ? lastBgUrl : ''
+      }));
+    }catch(e){ /* storage full or unavailable — theme still applies for this session */ }
+  }
+  function loadThemeFromStorage(){
+    let saved = null;
+    try{ saved = JSON.parse(localStorage.getItem('gameAppearance')||'null'); }catch(e){}
+    if(!saved) return;
+    applyTheme(saved.accent||'#8fe3a6', saved.voidColor||'#090c09');
+    accentPicker.value = saved.accent||'#8fe3a6';
+    voidPicker.value = saved.voidColor||'#090c09';
+    if(saved.bgUrl){
+      bgUrlInput.value = saved.bgUrl;
+      applyBackgroundImage(saved.bgUrl);
+    }
+  }
+
+  const accentPicker = document.getElementById('accentPicker');
+  const voidPicker = document.getElementById('voidPicker');
+  const bgUrlInput = document.getElementById('bgUrlInput');
+  const bgFileInput = document.getElementById('bgFileInput');
+
+  accentPicker.addEventListener('input', ()=> applyTheme(accentPicker.value, voidPicker.value));
+  voidPicker.addEventListener('input', ()=> applyTheme(accentPicker.value, voidPicker.value));
+
+  document.querySelectorAll('.theme-swatch').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const a = btn.dataset.accent, v = btn.dataset.void;
+      accentPicker.value = a; voidPicker.value = v;
+      applyTheme(a, v);
+      sfx.tick();
+    });
+  });
+
+  bgUrlInput.addEventListener('change', ()=>{
+    const url = bgUrlInput.value.trim();
+    if(url) applyBackgroundImage(url);
+  });
+  bgFileInput.addEventListener('change', (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev)=>{
+      bgUrlInput.value = '';
+      applyBackgroundImage(ev.target.result);
+    };
+    reader.readAsDataURL(file);
+  });
+  document.getElementById('clearBgBtn').addEventListener('click', ()=>{
+    clearBackgroundImage();
+    bgUrlInput.value = ''; bgFileInput.value = '';
+  });
+  document.getElementById('resetThemeBtn').addEventListener('click', ()=>{
+    accentPicker.value = '#8fe3a6'; voidPicker.value = '#090c09';
+    applyTheme('#8fe3a6','#090c09');
+    clearBackgroundImage();
+    bgUrlInput.value = ''; bgFileInput.value = '';
+    sfx.tick();
+  });
+
+  document.getElementById('settingsBtn').addEventListener('click', ()=>{ openModal('modalSettings'); sfx.tick(); });
+  document.getElementById('closeSettings').addEventListener('click', ()=> closeModal('modalSettings'));
+
+  /* ============================================================
      BOOT SEQUENCE
   ============================================================ */
   const bootLabel = document.getElementById('bootLabel');
   const bootBar = document.getElementById('bootBar');
   const startBtn = document.getElementById('startBtn');
   const bootEl = document.getElementById('boot');
+  const bootClockEl = document.getElementById('bootClock');
   const steps = ['Locating first hangout spot...','Counting green hoodies...','Importing avocado + yoghurt data...','Filtering out lemons...','Loading 21 years...','Ready.'];
   let bstep = 0;
   const bootIv = setInterval(()=>{
@@ -410,10 +640,20 @@
     bootLabel.textContent = steps[Math.min(bstep, steps.length-1)];
     if(bstep >= steps.length){ clearInterval(bootIv); startBtn.classList.add('show'); }
   }, 380);
+  let bootSeconds = 0;
+  const bootClockIv = setInterval(()=>{
+    if(bootEl.classList.contains('hide')){ clearInterval(bootClockIv); return; }
+    bootSeconds++;
+    const hh = String(Math.floor(bootSeconds/3600)).padStart(2,'0');
+    const mm = String(Math.floor((bootSeconds%3600)/60)).padStart(2,'0');
+    const ss = String(bootSeconds%60).padStart(2,'0');
+    bootClockEl.textContent = hh+':'+mm+':'+ss;
+  }, 1000);
   startBtn.addEventListener('click', ()=>{
     sfx.start();
     bootEl.classList.add('hide');
-    startGame();
+    inMenu = false;
+    paused = false;
   });
 
   /* ============================================================
@@ -700,6 +940,9 @@
     makePickup(50, yogGeo, yogMat, 'yoghurt')
   ];
 
+  // apply any theme/background saved from a previous visit, now that all materials exist
+  loadThemeFromStorage();
+
   /* ============================================================
      GAME LOOP
   ============================================================ */
@@ -755,7 +998,9 @@
     elapsed += dt;
     const t = (elapsed % DAY_LENGTH)/DAY_LENGTH;
     const factor = (Math.sin(t*Math.PI*2 - Math.PI/2)+1)/2; // 0 midnight .. 1 noon
-    scene.background = dayColor.clone().lerp(nightColor, 1-factor);
+    if(!customBgImage){
+      scene.background = dayColor.clone().lerp(nightColor, 1-factor);
+    }
     starMat.opacity = Math.max(0, 1-factor-0.2) * 0.8;
   }
 
