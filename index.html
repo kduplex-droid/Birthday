@@ -242,6 +242,17 @@
   .g-tile img,.g-tile video{ width:100%; height:100%; object-fit:cover; }
   .g-tile.empty{ display:flex; align-items:center; justify-content:center; border:1px dashed var(--line); }
   .g-tile.empty .plus{ font-family:var(--mono); font-size:10px; color:var(--text-muted); text-align:center; padding:0 8px; }
+  .g-tile-remove{
+    position:absolute; top:6px; right:6px; z-index:2;
+    width:24px; height:24px; border-radius:50%;
+    background:rgba(9,12,9,0.78); border:1px solid var(--line); color:var(--text);
+    font-family:var(--mono); font-size:12px; line-height:1;
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+    opacity:0; transition:opacity .2s, background .2s, border-color .2s, color .2s;
+  }
+  .g-tile:hover .g-tile-remove, .g-tile-remove:focus{ opacity:1; }
+  .g-tile-remove:hover{ background:var(--danger); border-color:var(--danger); color:var(--void); }
+  body.is-touch .g-tile-remove{ opacity:1; }
 
   /* ============================================================
      FINALE
@@ -388,9 +399,9 @@
     </p>
     <button class="archive-btn" id="uploadBtn">+ Upload a Photo</button>
     <div class="g-grid" id="galleryGrid">
-      <div class="g-tile" data-full="REPLACE_WITH_IMAGE_1.jpg"><img src="REPLACE_WITH_IMAGE_1.jpg" alt="Archive photo one" loading="lazy"></div>
-      <div class="g-tile" data-full="REPLACE_WITH_IMAGE_2.jpg"><img src="REPLACE_WITH_IMAGE_2.jpg" alt="Archive photo two" loading="lazy"></div>
-      <div class="g-tile" data-full="REPLACE_WITH_VIDEO_1.mp4"><video src="REPLACE_WITH_VIDEO_1.mp4" muted loop playsinline></video></div>
+      <div class="g-tile" data-full="REPLACE_WITH_IMAGE_1.jpg" data-id="placeholder-1"><img src="REPLACE_WITH_IMAGE_1.jpg" alt="Archive photo one" loading="lazy"></div>
+      <div class="g-tile" data-full="REPLACE_WITH_IMAGE_2.jpg" data-id="placeholder-2"><img src="REPLACE_WITH_IMAGE_2.jpg" alt="Archive photo two" loading="lazy"></div>
+      <div class="g-tile" data-full="REPLACE_WITH_VIDEO_1.mp4" data-id="placeholder-3"><video src="REPLACE_WITH_VIDEO_1.mp4" muted loop playsinline></video></div>
       <div class="g-tile empty" id="emptyTile"><div class="plus">+<br>add yours</div></div>
     </div>
   </div>
@@ -478,6 +489,8 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://upload-widget.cloudinary.com/global/all.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script>
 (function(){
   /* ============================================================
@@ -485,6 +498,50 @@
   ============================================================ */
   const CLOUDINARY_CLOUD_NAME    = "gmxwgxmw";
   const CLOUDINARY_UPLOAD_PRESET = "Birthday";
+
+  /* ============================================================
+     FIREBASE CONFIG — enables the archive gallery to sync across
+     every browser & device (instead of only the browser it was
+     uploaded from). Cloudinary still hosts the actual image files;
+     Firestore just stores the shared list of "which photos belong
+     in the gallery" and "which starter tiles were removed".
+
+     SETUP:
+     1. console.firebase.google.com → Add project (Analytics optional)
+     2. Build → Firestore Database → Create database → test mode is fine
+     3. Project settings (gear icon) → Your apps → </> Web → Register app
+        → copy the firebaseConfig object → paste the values below.
+     4. In Firestore → Rules, paste:
+
+          rules_version = '2';
+          service cloud.firestore {
+            match /databases/{database}/documents {
+              match /archivePhotos/{id} {
+                allow read, create, delete: if true;
+              }
+              match /archiveMeta/{id} {
+                allow read, write: if true;
+              }
+            }
+          }
+
+     If you leave apiKey as "YOUR_API_KEY", the gallery quietly falls
+     back to storing photos only in the current browser (old behaviour).
+  ============================================================ */
+  const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyDjJJXVQgCQdab2_yxztX-oiylISBBausI",
+    authDomain: "bday-482e0.firebaseapp.com",
+    projectId: "bday-482e0",
+    storageBucket: "bday-482e0.firebasestorage.app",
+    messagingSenderId: "1032933481159",
+    appId: "1:1032933481159:web:49cb21d452ff74f037fce2"
+  };
+  const FIREBASE_CONFIGURED = FIREBASE_CONFIG.apiKey !== "YOUR_API_KEY";
+  let db = null;
+  if(FIREBASE_CONFIGURED && window.firebase){
+    firebase.initializeApp(FIREBASE_CONFIG);
+    db = firebase.firestore();
+  }
 
   const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -1232,11 +1289,12 @@
     });
   }
 
-  /* ---------------- gallery / cloudinary ---------------- */
+  /* ---------------- gallery / cloudinary / firebase sync ---------------- */
   const galleryGrid = document.getElementById('galleryGrid');
   const emptyTile = document.getElementById('emptyTile');
   const lightbox = document.getElementById('lightbox');
   const lightboxContent = document.getElementById('lightboxContent');
+  const renderedPhotoTiles = {}; // firestore doc id -> tile element (only used when db is configured)
 
   function bindTile(tile){
     tile.addEventListener('click', ()=>{
@@ -1248,24 +1306,110 @@
       lightbox.classList.add('open');
     });
   }
-  document.querySelectorAll('.g-tile[data-full]').forEach(bindTile);
-  document.getElementById('lightboxClose').addEventListener('click', ()=> lightbox.classList.remove('open'));
 
-  function addImageToGrid(url){
+  function makePhotoTile(url){
     const tile = document.createElement('div');
     tile.className = 'g-tile';
     tile.setAttribute('data-full', url);
     tile.innerHTML = '<img src="'+url+'" alt="Added to the archive" loading="lazy">';
     bindTile(tile);
-    galleryGrid.insertBefore(tile, emptyTile);
-    const saved = JSON.parse(localStorage.getItem('archiveUploads')||'[]');
-    saved.push(url);
-    localStorage.setItem('archiveUploads', JSON.stringify(saved));
+    return tile;
   }
-  (function restoreUploads(){
-    const saved = JSON.parse(localStorage.getItem('archiveUploads')||'[]');
-    saved.forEach(url => addImageToGrid(url));
+
+  function addRemoveButton(tile, key){
+    const btn = document.createElement('button');
+    btn.className = 'g-tile-remove';
+    btn.type = 'button';
+    btn.setAttribute('aria-label', 'Remove photo');
+    btn.textContent = '✕';
+    btn.addEventListener('click', (e)=>{ e.stopPropagation(); removeGalleryEntry(tile, key); });
+    btn.addEventListener('touchstart', (e)=>{ e.stopPropagation(); e.preventDefault(); removeGalleryEntry(tile, key); }, {passive:false});
+    tile.appendChild(btn);
+  }
+
+  function removeGalleryEntry(tile, key){
+    const confirmMsg = db ? 'Remove this photo? This removes it for everyone.' : 'Remove this photo?';
+    if(!window.confirm(confirmMsg)) return;
+
+    if(key.indexOf('upload:') === 0){
+      const id = key.slice(7); // firestore doc id when db is on, otherwise the url itself
+      if(db){
+        db.collection('archivePhotos').doc(id).delete().catch(()=>{
+          alert("Couldn't remove it — check your connection and try again.");
+        });
+        // the onSnapshot listener below removes the tile once the delete syncs
+      } else {
+        tile.remove();
+        const saved = JSON.parse(localStorage.getItem('archiveUploads')||'[]').filter(u=> u!==id);
+        localStorage.setItem('archiveUploads', JSON.stringify(saved));
+      }
+    } else {
+      tile.remove();
+      if(db){
+        db.collection('archiveMeta').doc('removedPlaceholders').set({
+          ids: firebase.firestore.FieldValue.arrayUnion(key)
+        }, { merge:true }).catch(()=>{});
+      }
+      const removed = JSON.parse(localStorage.getItem('archiveRemovedPlaceholders')||'[]');
+      if(removed.indexOf(key) === -1) removed.push(key);
+      localStorage.setItem('archiveRemovedPlaceholders', JSON.stringify(removed));
+    }
+  }
+
+  // hide any locally-known removed placeholder tiles right away (avoids a flash before Firestore responds)
+  (function hideRemovedPlaceholdersLocal(){
+    const removed = JSON.parse(localStorage.getItem('archiveRemovedPlaceholders')||'[]');
+    removed.forEach(id=>{
+      const tile = galleryGrid.querySelector('.g-tile[data-id="'+id+'"]');
+      if(tile) tile.remove();
+    });
   })();
+
+  document.querySelectorAll('.g-tile[data-full]').forEach(tile=>{
+    bindTile(tile);
+    const key = tile.dataset.id || ('upload:'+tile.getAttribute('data-full'));
+    addRemoveButton(tile, key);
+  });
+  document.getElementById('lightboxClose').addEventListener('click', ()=> lightbox.classList.remove('open'));
+
+  function addImageToGridLocal(url){
+    const tile = makePhotoTile(url);
+    addRemoveButton(tile, 'upload:'+url);
+    galleryGrid.insertBefore(tile, emptyTile);
+    return tile;
+  }
+
+  if(db){
+    // live sync: placeholder removals, shared by everyone who opens this page
+    db.collection('archiveMeta').doc('removedPlaceholders').onSnapshot(snap=>{
+      const ids = (snap.exists && snap.data().ids) || [];
+      document.querySelectorAll('.g-tile[data-id]').forEach(tile=>{
+        if(ids.indexOf(tile.dataset.id) !== -1) tile.remove();
+      });
+    }, ()=>{ /* offline or blocked — the local removal above still applies */ });
+
+    // live sync: uploaded photos, shared by everyone who opens this page
+    db.collection('archivePhotos').orderBy('createdAt','asc').onSnapshot(snap=>{
+      snap.docChanges().forEach(change=>{
+        if(change.type === 'added' && !renderedPhotoTiles[change.doc.id]){
+          const data = change.doc.data();
+          const tile = makePhotoTile(data.url);
+          addRemoveButton(tile, 'upload:'+change.doc.id);
+          galleryGrid.insertBefore(tile, emptyTile);
+          renderedPhotoTiles[change.doc.id] = tile;
+        } else if(change.type === 'removed' && renderedPhotoTiles[change.doc.id]){
+          renderedPhotoTiles[change.doc.id].remove();
+          delete renderedPhotoTiles[change.doc.id];
+        }
+      });
+    }, ()=>{
+      alert('Could not connect to the shared photo archive — check your Firebase setup.');
+    });
+  } else {
+    // no Firebase configured yet: fall back to this-browser-only storage
+    const saved = JSON.parse(localStorage.getItem('archiveUploads')||'[]');
+    saved.forEach(addImageToGridLocal);
+  }
 
   document.getElementById('uploadBtn').addEventListener('click', ()=>{
     if(CLOUDINARY_CLOUD_NAME === "YOUR_CLOUD_NAME"){
@@ -1279,7 +1423,22 @@
         textDark:'#090c09', textLight:'#e9efe7', link:'#8fe3a6', action:'#8fe3a6', inactiveTabIcon:'#8fa396',
         error:'#e3806f', inProgress:'#8fe3a6', complete:'#8fe3a6', sourceBg:'#121a14' } }
     }, (error, result)=>{
-      if(!error && result && result.event === 'success') addImageToGrid(result.info.secure_url);
+      if(error || !result || result.event !== 'success') return;
+      const url = result.info.secure_url;
+      if(db){
+        db.collection('archivePhotos').add({
+          url: url,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        }).catch(()=>{
+          alert("Uploaded, but couldn't save it to the shared archive — check your Firebase setup.");
+        });
+        // the onSnapshot listener above adds the tile once the write syncs
+      } else {
+        addImageToGridLocal(url);
+        const saved = JSON.parse(localStorage.getItem('archiveUploads')||'[]');
+        saved.push(url);
+        localStorage.setItem('archiveUploads', JSON.stringify(saved));
+      }
     });
     widget.open();
   });
